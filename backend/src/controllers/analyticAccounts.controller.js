@@ -3,7 +3,7 @@ import { pool } from '../config/supabase.js';
 export async function getAnalyticAccounts(req, res) {
   const { type } = req.query;
 
-  try {
+  try {   
     let query = 'SELECT id, name, type FROM analytic_accounts';
     const params = [];
     
@@ -103,5 +103,59 @@ export async function getAnalyticBudgets(req, res) {
     });
   } catch (error) {
     return res.status(500).json({ success: false, data: null, error: { message: 'Server error' } });
+  }
+}
+export async function deleteAnalyticAccount(req, res) {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query('DELETE FROM analytic_accounts WHERE id = $1 RETURNING id', [id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: {
+          code: 'NOT_FOUND',
+          message: 'Analytic account not found'
+        }
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: result.rows[0],
+      error: null
+    });
+  } catch (error) {
+    console.error('Error deleting analytic account:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: {
+        code: 'DB_ERROR',
+        message: 'Failed to delete analytic account'
+      }
+    });
+  }
+}
+      [name, type]
+    );
+
+    return res.status(201).json({
+      success: true,
+      data: result.rows[0],
+      error: null
+    });
+  } catch (error) {
+    console.error('Error creating analytic account:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: {
+        code: 'DB_ERROR',
+        message: 'Failed to create analytic account'
+      }
+    });
   }
 }
