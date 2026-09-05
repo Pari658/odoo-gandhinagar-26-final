@@ -179,40 +179,7 @@ const inMemoryStore = {
       created_at: new Date().toISOString()
     }
   ],
-  journals: [
-    {
-      id: 'j-sales',
-      name: 'Customer Sales Journal',
-      type: 'sales',
-      default_debit_account_id: 'acc-103',
-      default_credit_account_id: 'acc-401',
-      created_at: new Date().toISOString()
-    },
-    {
-      id: 'j-purchase',
-      name: 'Vendor Purchase Journal',
-      type: 'purchase',
-      default_debit_account_id: 'acc-501',
-      default_credit_account_id: 'acc-201',
-      created_at: new Date().toISOString()
-    },
-    {
-      id: 'j-bank',
-      name: 'Bank Receipts & Payments',
-      type: 'bank',
-      default_debit_account_id: 'acc-101',
-      default_credit_account_id: 'acc-101',
-      created_at: new Date().toISOString()
-    },
-    {
-      id: 'j-cash',
-      name: 'Cash Receipts & Payments',
-      type: 'cash',
-      default_debit_account_id: 'acc-102',
-      default_credit_account_id: 'acc-102',
-      created_at: new Date().toISOString()
-    }
-  ],
+  journals: [],
   tax_rates: [
     {
       id: 'tax-gst18',
