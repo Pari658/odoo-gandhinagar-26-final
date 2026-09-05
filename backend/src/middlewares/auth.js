@@ -13,7 +13,7 @@ function getRefreshSecret() {
 }
 
 /**
- * Generate Access Token (Short-lived 15 mins)
+ * Generate Access Token (Short-lived 90 mins)
  */
 export function generateAccessToken(user) {
   return jwt.sign(
@@ -24,7 +24,7 @@ export function generateAccessToken(user) {
       contactId: user.contact_id || user.contactId || null
     },
     getAccessSecret(),
-    { expiresIn: '7d' } // Extended for hackathon demo to avoid session drops
+    { expiresIn: '90m' } // Set to 90 minutes as requested
   );
 }
 
