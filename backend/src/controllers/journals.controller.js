@@ -164,6 +164,7 @@ export async function updateJournal(req, res) {
     `;
     const result = await query(updateSql, [name.trim(), type.toLowerCase(), debitAccId, creditAccId, id]);
 
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         data: null,
@@ -203,6 +204,7 @@ export async function deleteJournal(req, res) {
     const deleteSql = 'DELETE FROM journals WHERE id = $1 RETURNING id, name;';
     const result = await query(deleteSql, [id]);
 
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         data: null,
