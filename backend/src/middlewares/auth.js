@@ -1,7 +1,20 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'urban_furniture_access_secret_2026_key';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'urban_furniture_refresh_secret_2026_key';
+/**
+ * Lazily read JWT secrets so dotenv.config() in server.js has time to run
+ * before these values are resolved. Fail-fast if secrets are missing.
+ */
+function getAccessSecret() {
+  const secret = process.env.JWT_ACCESS_SECRET;
+  if (!secret) throw new Error('JWT_ACCESS_SECRET env variable is not set');
+  return secret;
+}
+
+function getRefreshSecret() {
+  const secret = process.env.JWT_REFRESH_SECRET;
+  if (!secret) throw new Error('JWT_REFRESH_SECRET env variable is not set');
+  return secret;
+}
 
 /**
  * Generate Access Token (Short-lived 15 mins)
@@ -14,7 +27,7 @@ export function generateAccessToken(user) {
       role: user.role,
       contactId: user.contact_id || user.contactId || null
     },
-    JWT_ACCESS_SECRET,
+    getAccessSecret(),
     { expiresIn: '15m' }
   );
 }
@@ -30,7 +43,7 @@ export function generateRefreshToken(user) {
       role: user.role,
       contactId: user.contact_id || user.contactId || null
     },
-    JWT_REFRESH_SECRET,
+    getRefreshSecret(),
     { expiresIn: '7d' }
   );
 }
@@ -40,7 +53,7 @@ export function generateRefreshToken(user) {
  */
 export function verifyRefreshToken(token) {
   return new Promise((resolve, reject) => {
-    jwt.verify(token, JWT_REFRESH_SECRET, (err, decoded) => {
+    jwt.verify(token, getRefreshSecret(), (err, decoded) => {
       if (err) return reject(err);
       resolve(decoded);
     });
@@ -66,7 +79,7 @@ export function authenticateToken(req, res, next) {
     });
   }
 
-  jwt.verify(token, JWT_ACCESS_SECRET, (err, user) => {
+  jwt.verify(token, getAccessSecret(), (err, user) => {
     if (err) {
       return res.status(401).json({
         success: false,

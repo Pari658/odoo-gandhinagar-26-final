@@ -1,9 +1,9 @@
 import bcrypt from 'bcryptjs';
-import { query, inMemoryStore } from '../db/index.js';
-import { 
-  generateAccessToken, 
-  generateRefreshToken, 
-  verifyRefreshToken 
+import { query, pool, inMemoryStore } from '../db/index.js';
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  verifyRefreshToken
 } from '../middlewares/auth.js';
 
 /**
@@ -30,7 +30,9 @@ export async function login(req, res) {
   // 1. Try querying Supabase PostgreSQL
   try {
     const dbRes = await query(
-      'SELECT * FROM users WHERE LOWER(email) = LOWER($1) OR LOWER(login_id) = LOWER($1)',
+      `SELECT id, login_id, email, password_hash, role, contact_id, is_active, created_at
+       FROM users
+       WHERE LOWER(email) = LOWER($1) OR LOWER(login_id) = LOWER($1)`,
       [loginInput.trim()]
     );
     if (dbRes && dbRes.rows && dbRes.rows.length > 0) {
@@ -42,8 +44,8 @@ export async function login(req, res) {
 
   // 2. Fallback to inMemoryStore if not found in DB
   if (!user) {
-    user = inMemoryStore.users.find(u => 
-      u.email?.toLowerCase() === loginInput.trim().toLowerCase() || 
+    user = inMemoryStore.users.find(u =>
+      u.email?.toLowerCase() === loginInput.trim().toLowerCase() ||
       u.login_id?.toLowerCase() === loginInput.trim().toLowerCase()
     );
   }
@@ -64,16 +66,18 @@ export async function login(req, res) {
   let linkedContact = null;
   try {
     const contactRes = await query(
-      'SELECT * FROM contacts WHERE user_id = $1 OR LOWER(email) = LOWER($2)',
+      'SELECT id, user_id, name, type, email FROM contacts WHERE user_id = $1 OR LOWER(email) = LOWER($2)',
       [user.id, user.email]
     );
     if (contactRes && contactRes.rows && contactRes.rows.length > 0) {
       linkedContact = contactRes.rows[0];
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('Contact lookup warning:', e.message);
+  }
 
   if (!linkedContact) {
-    linkedContact = inMemoryStore.contacts.find(c => 
+    linkedContact = inMemoryStore.contacts.find(c =>
       c.id === user.contact_id || c.email?.toLowerCase() === user.email.toLowerCase()
     );
   }
@@ -189,7 +193,9 @@ export async function signup(req, res) {
         }
       });
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('Duplicate login check warning:', e.message);
+  }
 
   const memDupLogin = inMemoryStore.users.find(u => u.login_id?.toLowerCase() === cleanLoginId.toLowerCase());
   if (memDupLogin) {
@@ -218,7 +224,9 @@ export async function signup(req, res) {
         }
       });
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('Duplicate email check warning:', e.message);
+  }
 
   const memDupEmail = inMemoryStore.users.find(u => u.email.toLowerCase() === cleanEmail.toLowerCase());
   if (memDupEmail) {
@@ -240,31 +248,44 @@ export async function signup(req, res) {
   let createdUser = null;
   let createdContact = null;
 
-  // 6. SQL INSERT Into Supabase PostgreSQL Database
-  try {
-    const userInsertRes = await query(
-      `INSERT INTO users (login_id, email, password_hash, role, is_active, created_at, updated_at)
-       VALUES ($1, $2, $3, 'contact', true, NOW(), NOW())
-       RETURNING id, login_id, email, role, created_at`,
-      [cleanLoginId, cleanEmail, passwordHash]
-    );
+  // 6. SQL INSERT Into Supabase PostgreSQL Database — wrapped in a transaction
+  const client = await pool.connect().catch(() => null);
 
-    if (userInsertRes && userInsertRes.rows && userInsertRes.rows.length > 0) {
-      createdUser = userInsertRes.rows[0];
+  if (client) {
+    try {
+      await client.query('BEGIN');
 
-      const contactInsertRes = await query(
-        `INSERT INTO contacts (user_id, name, type, email, is_archived, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, false, NOW(), NOW())
-         RETURNING id, user_id, name, type, email, created_at`,
-        [createdUser.id, contactName, userRole, cleanEmail]
+      const userInsertRes = await client.query(
+        `INSERT INTO users (login_id, email, password_hash, role, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, 'contact', true, NOW(), NOW())
+         RETURNING id, login_id, email, role, created_at`,
+        [cleanLoginId, cleanEmail, passwordHash]
       );
 
-      if (contactInsertRes && contactInsertRes.rows && contactInsertRes.rows.length > 0) {
-        createdContact = contactInsertRes.rows[0];
+      if (userInsertRes && userInsertRes.rows && userInsertRes.rows.length > 0) {
+        createdUser = userInsertRes.rows[0];
+
+        const contactInsertRes = await client.query(
+          `INSERT INTO contacts (user_id, name, type, email, is_archived, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, false, NOW(), NOW())
+           RETURNING id, user_id, name, type, email, created_at`,
+          [createdUser.id, contactName, userRole, cleanEmail]
+        );
+
+        if (contactInsertRes && contactInsertRes.rows && contactInsertRes.rows.length > 0) {
+          createdContact = contactInsertRes.rows[0];
+        }
       }
+
+      await client.query('COMMIT');
+    } catch (dbErr) {
+      await client.query('ROLLBACK').catch(() => {});
+      console.warn('Supabase DB Insert Warning (using store fallback):', dbErr.message);
+      createdUser = null;
+      createdContact = null;
+    } finally {
+      client.release();
     }
-  } catch (dbErr) {
-    console.warn('Supabase DB Insert Warning (using store fallback):', dbErr.message);
   }
 
   // 7. Fallback / Sync to store
@@ -320,7 +341,7 @@ export async function signup(req, res) {
 
   inMemoryStore.refreshTokens.add(refreshToken);
 
-  console.log(`✅ USER & CONTACT CREATED IN SUPABASE POSTGRESQL DB! ID: ${createdUser.id}, LoginID: ${createdUser.login_id}`);
+  console.log(`✅ USER & CONTACT CREATED! ID: ${createdUser.id}, LoginID: ${createdUser.login_id}`);
 
   return res.status(201).json({
     success: true,
@@ -397,17 +418,27 @@ export async function logout(req, res) {
   });
 }
 
+/**
+ * Get Current User Profile
+ */
 export async function me(req, res) {
   let linkedContact = null;
   try {
-    const contactRes = await query('SELECT * FROM contacts WHERE user_id = $1 OR LOWER(email) = LOWER($2)', [req.user.id, req.user.email]);
+    const contactRes = await query(
+      'SELECT id, user_id, name, type, email FROM contacts WHERE user_id = $1 OR LOWER(email) = LOWER($2)',
+      [req.user.id, req.user.email]
+    );
     if (contactRes && contactRes.rows && contactRes.rows.length > 0) {
       linkedContact = contactRes.rows[0];
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('Contact lookup in /me warning:', e.message);
+  }
 
   if (!linkedContact) {
-    linkedContact = inMemoryStore.contacts.find(c => c.id === req.user.contactId || c.email?.toLowerCase() === req.user.email.toLowerCase());
+    linkedContact = inMemoryStore.contacts.find(c =>
+      c.id === req.user.contactId || c.email?.toLowerCase() === req.user.email.toLowerCase()
+    );
   }
 
   return res.json({

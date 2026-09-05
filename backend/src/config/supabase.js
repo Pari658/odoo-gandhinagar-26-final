@@ -1,34 +1,32 @@
 import pg from 'pg';
-import dotenv from 'dotenv';
-dotenv.config();
-
+import { ENV } from '../lib/env.js';
 const { Pool } = pg;
 
-const connectionString = process.env.SUPABASE_CONNECTION_STRING;
+const connectionString = ENV.SUPABASE_CONNECTION_STRING;
 
 export const pool = new Pool({
-  connectionString,
-  ssl: { rejectUnauthorized: false },
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000
+    connectionString,
+    ssl: false,
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000
 });
 
 pool.on('connect', () => {
-  console.log('✅ Supabase PostgreSQL Connection Pool Active');
+    console.log('✅ Supabase PostgreSQL Connection Pool Active');
 });
 
 pool.on('error', (err) => {
-  console.error('❌ Supabase PostgreSQL Connection Pool Error:', err.message);
+    console.error('❌ Supabase PostgreSQL Connection Pool Error:', err.message);
 });
 
 export async function query(text, params = []) {
-  try {
-    return await pool.query(text, params);
-  } catch (err) {
-    console.error('Supabase Query Error:', err.message);
-    throw err;
-  }
+    try {
+        return await pool.query(text, params);
+    } catch (err) {
+        console.error('Supabase Query Error:', err.message);
+        throw err;
+    }
 }
 
 export default pool;
