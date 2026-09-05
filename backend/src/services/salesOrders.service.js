@@ -1,201 +1,263 @@
 import pool from '../config/supabase.js';
 import { generateSONumber, calculateLineTotals, calculateOrderTotals } from '../lib/salesHelpers.js';
 
-/**
- * Create a new Sales Order with line items.
- * Status starts as 'draft'.
- */
 export async function createSalesOrder({ customerId, orderDate, lines, createdBy }) {
   const client = await pool.connect();
 
   try {
     await client.query('BEGIN');
 
-    // Validate customer exists and is of type 'customer' or 'both'
-    const customerResult = await client.query(
-      `SELECT id, name, type FROM contacts WHERE id = $1 AND is_archived = false`,
-      [customerId]
-    );
-
-    if (customerResult.rows.length === 0) {
+    // Validate customer
+    const customerRes = await client.query('SELECT id, name, type FROM contacts WHERE id = $1 AND is_archived = false', [customerId]);
+    if (customerRes.rows.length === 0) {
       throw { status: 404, code: 'NOT_FOUND', message: 'Customer not found' };
     }
-
-    const customer = customerResult.rows[0];
+    const customer = customerRes.rows[0];
     if (customer.type !== 'customer' && customer.type !== 'both') {
       throw { status: 400, code: 'VALIDATION_ERROR', message: 'Contact is not a customer', field: 'customerId' };
-    }
-
-    // Validate all products exist
-    for (const line of lines) {
-      const productResult = await client.query(
-        `SELECT id FROM products WHERE id = $1 AND is_archived = false`,
-        [line.productId]
-      );
-      if (productResult.rows.length === 0) {
-        throw { status: 404, code: 'NOT_FOUND', message: `Product not found: ${line.productId}` };
-      }
-    }
-
-    // Fetch tax rates for lines that have taxRateId
-    for (const line of lines) {
-      if (line.taxRateId) {
-        const taxResult = await client.query(
-          `SELECT rate_percent FROM tax_rates WHERE id = $1`,
-          [line.taxRateId]
-        );
-        if (taxResult.rows.length === 0) {
-          throw { status: 404, code: 'NOT_FOUND', message: `Tax rate not found: ${line.taxRateId}` };
-        }
-        line.taxRatePercent = parseFloat(taxResult.rows[0].rate_percent);
-      } else {
-        line.taxRatePercent = 0;
-      }
     }
 
     // Generate SO number
     const number = await generateSONumber();
 
-    // Insert sales_orders header
-    const soResult = await client.query(
-      `INSERT INTO sales_orders (number, customer_id, status, order_date, created_by)
-       VALUES ($1, $2, 'draft', $3, $4)
-       RETURNING *`,
-      [number, customerId, orderDate || new Date().toISOString().split('T')[0], createdBy]
+    // Create Header
+    const soDate = orderDate || new Date().toISOString().split('T')[0];
+    const soInsert = await client.query(
+      `INSERT INTO sales_orders (number, customer_id, status, order_date, created_by, created_at)
+       VALUES ($1, $2, 'draft', $3, $4, NOW())
+       RETURNING id, number, status, order_date, created_at`,
+      [number, customerId, soDate, createdBy]
     );
+    const salesOrder = soInsert.rows[0];
 
-    const salesOrder = soResult.rows[0];
-
-    // Insert sales_order_lines
-    const insertedLines = [];
+    const enrichedLines = [];
     for (const line of lines) {
-      const lineResult = await client.query(
+      // Validate product
+      const productRes = await client.query('SELECT id, name FROM products WHERE id = $1 AND is_archived = false', [line.productId]);
+      if (productRes.rows.length === 0) {
+        throw { status: 404, code: 'NOT_FOUND', message: `Product not found: ${line.productId}` };
+      }
+      const product = productRes.rows[0];
+
+      // Validate tax rate
+      let taxRatePercent = 0;
+      if (line.taxRateId) {
+        const taxRes = await client.query('SELECT id, rate_percent FROM tax_rates WHERE id = $1', [line.taxRateId]);
+        if (taxRes.rows.length === 0) {
+          throw { status: 404, code: 'NOT_FOUND', message: `Tax rate not found: ${line.taxRateId}` };
+        }
+        taxRatePercent = taxRes.rows[0].rate_percent;
+      }
+
+      const lineInsert = await client.query(
         `INSERT INTO sales_order_lines (sales_order_id, product_id, analytic_account_id, quantity, unit_price, tax_rate_id)
          VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING *`,
-        [
-          salesOrder.id,
-          line.productId,
-          line.analyticAccountId || null,
-          line.quantity,
-          line.unitPrice,
-          line.taxRateId || null,
-        ]
+         RETURNING id`,
+        [salesOrder.id, product.id, line.analyticAccountId || null, line.quantity, line.unitPrice, line.taxRateId || null]
       );
-      insertedLines.push(lineResult.rows[0]);
+
+      enrichedLines.push({
+        id: lineInsert.rows[0].id,
+        productId: product.id,
+        productName: product.name,
+        analyticAccountId: line.analyticAccountId || null,
+        quantity: parseFloat(line.quantity),
+        unitPrice: parseFloat(line.unitPrice),
+        taxRateId: line.taxRateId || null,
+        taxRatePercent: parseFloat(taxRatePercent)
+      });
     }
 
     await client.query('COMMIT');
 
-    // Calculate totals for the response
-    const totals = calculateOrderTotals(lines);
+    const totals = calculateOrderTotals(enrichedLines.map(l => ({
+      quantity: l.quantity,
+      unitPrice: l.unitPrice,
+      taxRatePercent: l.taxRatePercent
+    })));
 
     return {
       id: salesOrder.id,
       number: salesOrder.number,
-      customerId: salesOrder.customer_id,
+      customerId,
       customerName: customer.name,
       status: salesOrder.status,
       orderDate: salesOrder.order_date,
-      createdBy: salesOrder.created_by,
+      createdBy,
       createdAt: salesOrder.created_at,
       ...totals,
-      lines: insertedLines.map((l, i) => ({
+      lines: enrichedLines.map(l => ({
         id: l.id,
-        productId: l.product_id,
-        analyticAccountId: l.analytic_account_id,
-        quantity: parseFloat(l.quantity),
-        unitPrice: parseFloat(l.unit_price),
-        taxRateId: l.tax_rate_id,
-        taxRatePercent: lines[i].taxRatePercent,
-        ...calculateLineTotals(parseFloat(l.quantity), parseFloat(l.unit_price), lines[i].taxRatePercent),
+        productId: l.productId,
+        productName: l.productName,
+        analyticAccountId: l.analyticAccountId,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        taxRateId: l.taxRateId,
+        taxRatePercent: l.taxRatePercent,
+        ...calculateLineTotals(l.quantity, l.unitPrice, l.taxRatePercent),
       })),
     };
   } catch (err) {
     await client.query('ROLLBACK');
-    throw err;
+    if (err.status) throw err; // rethrow custom errors
+    throw { status: 500, code: 'SERVER_ERROR', message: err.message };
   } finally {
     client.release();
   }
 }
 
-/**
- * Get all Sales Orders with pagination.
- */
-export async function getSalesOrders({ page = 1, pageSize = 20 } = {}) {
-  const offset = (page - 1) * pageSize;
+export async function getSalesOrders({ page = 1, pageSize = 10, search = '' } = {}) {
+  const limit = parseInt(pageSize, 10) || 10;
+  const offset = (page - 1) * limit;
 
-  const countResult = await pool.query(`SELECT COUNT(*) FROM sales_orders`);
-  const totalCount = parseInt(countResult.rows[0].count, 10);
+  let whereClause = '';
+  const paramsCount = [];
+  const paramsSelect = [limit, offset];
 
-  const result = await pool.query(
-    `SELECT so.*, c.name AS customer_name
-     FROM sales_orders so
-     JOIN contacts c ON c.id = so.customer_id
-     ORDER BY so.created_at DESC
-     LIMIT $1 OFFSET $2`,
-    [pageSize, offset]
-  );
+  if (search) {
+    whereClause = 'WHERE so.number ILIKE $1 OR c.name ILIKE $1';
+    paramsCount.push(`%${search}%`);
+    paramsSelect.push(`%${search}%`);
+  }
 
-  const items = result.rows.map((row) => ({
-    id: row.id,
-    number: row.number,
-    customerId: row.customer_id,
-    customerName: row.customer_name,
-    status: row.status,
-    orderDate: row.order_date,
-    createdBy: row.created_by,
-    createdAt: row.created_at,
+  const countQuery = `
+    SELECT COUNT(*) 
+    FROM sales_orders so
+    JOIN contacts c ON so.customer_id = c.id
+    ${whereClause}
+  `;
+  const countRes = await pool.query(countQuery, paramsCount);
+  const totalCount = parseInt(countRes.rows[0].count, 10);
+
+  // If search is used, it's parameter $3
+  const selectQuery = `
+    SELECT so.*, c.name as customer_name 
+    FROM sales_orders so 
+    JOIN contacts c ON so.customer_id = c.id 
+    ${whereClause.replace(/\$1/g, '$3')}
+    ORDER BY so.created_at DESC 
+    LIMIT $1 OFFSET $2
+  `;
+  const soRes = await pool.query(selectQuery, paramsSelect);
+
+  const items = soRes.rows.map(so => ({
+    id: so.id,
+    number: so.number,
+    customerId: so.customer_id,
+    customerName: so.customer_name,
+    status: so.status,
+    orderDate: so.order_date,
+    createdBy: so.created_by,
+    createdAt: so.created_at,
   }));
 
   return { items, page, pageSize, totalCount };
 }
 
-/**
- * Get a single Sales Order by ID, including line items with product names.
- */
+export async function updateSalesOrder(id, { customerId, orderDate, lines }) {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Verify it exists and is in draft state
+    const soRes = await client.query('SELECT status FROM sales_orders WHERE id = $1 FOR UPDATE', [id]);
+    if (soRes.rows.length === 0) {
+      throw { status: 404, code: 'NOT_FOUND', message: 'Sales order not found' };
+    }
+    if (soRes.rows[0].status !== 'draft') {
+      throw { status: 409, code: 'CONFLICT', message: `Cannot edit a sales order with status '${soRes.rows[0].status}'` };
+    }
+
+    // Validate customer
+    const customerRes = await client.query('SELECT id, name, type FROM contacts WHERE id = $1 AND is_archived = false', [customerId]);
+    if (customerRes.rows.length === 0) {
+      throw { status: 404, code: 'NOT_FOUND', message: 'Customer not found' };
+    }
+    const customer = customerRes.rows[0];
+
+    // Update Header
+    const soDate = orderDate || new Date().toISOString().split('T')[0];
+    await client.query(
+      `UPDATE sales_orders SET customer_id = $1, order_date = $2 WHERE id = $3`,
+      [customerId, soDate, id]
+    );
+
+    // Replace lines entirely
+    await client.query('DELETE FROM sales_order_lines WHERE sales_order_id = $1', [id]);
+
+    for (const line of lines) {
+      const productRes = await client.query('SELECT id FROM products WHERE id = $1 AND is_archived = false', [line.productId]);
+      if (productRes.rows.length === 0) {
+        throw { status: 404, code: 'NOT_FOUND', message: `Product not found: ${line.productId}` };
+      }
+
+      await client.query(
+        `INSERT INTO sales_order_lines (sales_order_id, product_id, analytic_account_id, quantity, unit_price, tax_rate_id)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [id, line.productId, line.analyticAccountId || null, line.quantity, line.unitPrice, line.taxRateId || null]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    return getSalesOrderById(id);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    if (err.status) throw err;
+    throw { status: 500, code: 'SERVER_ERROR', message: err.message };
+  } finally {
+    client.release();
+  }
+}
+
 export async function getSalesOrderById(id) {
-  const soResult = await pool.query(
-    `SELECT so.*, c.name AS customer_name
-     FROM sales_orders so
-     JOIN contacts c ON c.id = so.customer_id
+  const soRes = await pool.query(
+    `SELECT so.*, c.name as customer_name 
+     FROM sales_orders so 
+     JOIN contacts c ON so.customer_id = c.id 
      WHERE so.id = $1`,
     [id]
   );
 
-  if (soResult.rows.length === 0) {
+  if (soRes.rows.length === 0) {
     throw { status: 404, code: 'NOT_FOUND', message: 'Sales order not found' };
   }
 
-  const so = soResult.rows[0];
+  const so = soRes.rows[0];
 
-  const linesResult = await pool.query(
-    `SELECT sol.*, p.name AS product_name, tr.rate_percent AS tax_rate_percent
+  const linesRes = await pool.query(
+    `SELECT sol.*, p.name as product_name, t.rate_percent as tax_rate_percent 
      FROM sales_order_lines sol
-     JOIN products p ON p.id = sol.product_id
-     LEFT JOIN tax_rates tr ON tr.id = sol.tax_rate_id
+     JOIN products p ON sol.product_id = p.id
+     LEFT JOIN tax_rates t ON sol.tax_rate_id = t.id
      WHERE sol.sales_order_id = $1`,
     [id]
   );
 
-  const lines = linesResult.rows.map((l) => {
-    const taxRatePercent = l.tax_rate_percent ? parseFloat(l.tax_rate_percent) : 0;
+  const lines = linesRes.rows.map(l => {
+    const qty = parseFloat(l.quantity);
+    const price = parseFloat(l.unit_price);
+    const taxPct = parseFloat(l.tax_rate_percent || 0);
     return {
       id: l.id,
       productId: l.product_id,
       productName: l.product_name,
       analyticAccountId: l.analytic_account_id,
-      quantity: parseFloat(l.quantity),
-      unitPrice: parseFloat(l.unit_price),
+      quantity: qty,
+      unitPrice: price,
       taxRateId: l.tax_rate_id,
-      taxRatePercent,
-      ...calculateLineTotals(parseFloat(l.quantity), parseFloat(l.unit_price), taxRatePercent),
+      taxRatePercent: taxPct,
+      ...calculateLineTotals(qty, price, taxPct)
     };
   });
 
-  const totals = calculateOrderTotals(
-    lines.map((l) => ({ quantity: l.quantity, unitPrice: l.unitPrice, taxRatePercent: l.taxRatePercent }))
-  );
+  const totals = calculateOrderTotals(lines.map(l => ({
+    quantity: l.quantity,
+    unitPrice: l.unitPrice,
+    taxRatePercent: l.taxRatePercent
+  })));
 
   return {
     id: so.id,
@@ -211,27 +273,31 @@ export async function getSalesOrderById(id) {
   };
 }
 
-/**
- * Confirm a draft Sales Order (draft → confirmed).
- */
 export async function confirmSalesOrder(id) {
-  const soResult = await pool.query(
-    `SELECT id, status FROM sales_orders WHERE id = $1`,
-    [id]
-  );
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    const soRes = await client.query('SELECT status FROM sales_orders WHERE id = $1 FOR UPDATE', [id]);
+    if (soRes.rows.length === 0) {
+      throw { status: 404, code: 'NOT_FOUND', message: 'Sales order not found' };
+    }
+    
+    const so = soRes.rows[0];
+    if (so.status !== 'draft') {
+      throw { status: 409, code: 'CONFLICT', message: `Cannot confirm a sales order with status '${so.status}'` };
+    }
 
-  if (soResult.rows.length === 0) {
-    throw { status: 404, code: 'NOT_FOUND', message: 'Sales order not found' };
+    await client.query('UPDATE sales_orders SET status = $1 WHERE id = $2', ['confirmed', id]);
+    
+    await client.query('COMMIT');
+    
+    return getSalesOrderById(id);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    if (err.status) throw err;
+    throw { status: 500, code: 'SERVER_ERROR', message: err.message };
+  } finally {
+    client.release();
   }
-
-  if (soResult.rows[0].status !== 'draft') {
-    throw { status: 409, code: 'CONFLICT', message: `Cannot confirm a sales order with status '${soResult.rows[0].status}'` };
-  }
-
-  await pool.query(
-    `UPDATE sales_orders SET status = 'confirmed', updated_at = NOW() WHERE id = $1`,
-    [id]
-  );
-
-  return getSalesOrderById(id);
 }

@@ -15,7 +15,7 @@ export async function generateSONumber() {
     return 'SO0001';
   }
 
-  const lastNumber = result.rows[0].number; // e.g. "SO0042"
+  const lastNumber = result.rows[0].number;
   const seq = parseInt(lastNumber.replace('SO', ''), 10) + 1;
   return `SO${String(seq).padStart(4, '0')}`;
 }

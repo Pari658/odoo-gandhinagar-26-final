@@ -249,7 +249,9 @@ const inMemoryStore = {
       name: 'Gandhinagar Store Renovation Project',
       type: 'expense'
     }
-  ]
+  ],
+  sales_orders: [],
+  sales_order_lines: []
 };
 
 export async function query(text, params = []) {
