@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Armchair, Key, UserPlus, ArrowRight, CheckCircle2, HelpCircle, ArrowLeft } from 'lucide-react';
 
-export default function AuthPage() {
+export default function AuthPage({ onBack }) {
   const { login, signup, loading } = useAuth();
   
   // View Modes: 'login' | 'signup' | 'forgot'
@@ -104,7 +104,19 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF6EE] dark:bg-[#120E0C] text-[#2C221E] dark:text-[#F5EFE6] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#FAF6EE] dark:bg-[#120E0C] text-[#2C221E] dark:text-[#F5EFE6] flex flex-col items-center justify-center p-4 relative">
+      
+      {/* Back Button */}
+      {onBack && (
+        <button 
+          onClick={onBack}
+          className="absolute top-6 left-6 flex items-center gap-2 px-4 py-2 rounded-full bg-white dark:bg-[#1C1613] text-[#6B5E55] dark:text-[#A89B91] font-semibold text-sm hover:text-[#B45309] dark:hover:text-[#B45309] border border-[#E6DFD5] dark:border-[#382D27] hover:border-[#B45309]/50 transition-all shadow-sm"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Home
+        </button>
+      )}
+
       <div className="max-w-md w-full space-y-6">
         
         {/* Brand Header */}
