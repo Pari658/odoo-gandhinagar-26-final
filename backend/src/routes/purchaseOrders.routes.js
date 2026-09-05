@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   getPurchaseOrders,
+  getPurchaseOrderById,
   createPurchaseOrder,
   confirmPurchaseOrder,
   createBillFromPO
@@ -15,6 +16,7 @@ const router = Router();
 router.use(authenticateToken);
 
 router.get('/', validate(commonSchema.paginationQuery), getPurchaseOrders);
+router.get('/:id', validate(commonSchema.uuidParam), getPurchaseOrderById);
 router.post('/', requireRole('admin', 'accountant'), validate(purchaseOrderSchema.create), createPurchaseOrder);
 router.post('/:id/confirm', requireRole('admin', 'accountant'), validate(commonSchema.uuidParam), confirmPurchaseOrder);
 router.post('/:id/create-bill', requireRole('admin', 'accountant'), validate(purchaseOrderSchema.createBill), createBillFromPO);
