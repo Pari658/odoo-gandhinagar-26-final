@@ -1,5 +1,4 @@
 import { query } from '../config/supabase.js';
-import { inMemoryStore } from '../db/index.js';
 
 /**
  * GET /api/v1/journals
@@ -31,23 +30,13 @@ export async function getJournals(req, res) {
     });
   } catch (err) {
     console.error('Error fetching journals from DB:', err.message);
-
-    // Fallback to in-memory if DB query fails
-    const formatted = inMemoryStore.journals.map(j => ({
-      id: j.id,
-      name: j.name,
-      type: j.type,
-      defaultDebitAccountId: j.default_debit_account_id || null,
-      defaultDebitAccountName: null,
-      defaultCreditAccountId: j.default_credit_account_id || null,
-      defaultCreditAccountName: null,
-      createdAt: j.created_at
-    }));
-
-    return res.json({
-      success: true,
-      data: formatted,
-      error: null
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: {
+        code: 'DB_ERROR',
+        message: 'Failed to fetch journals'
+      }
     });
   }
 }
@@ -109,29 +98,13 @@ export async function createJournal(req, res) {
     });
   } catch (err) {
     console.error('Error inserting journal into DB:', err.message);
-
-    // Fallback in-memory
-    const newJournal = {
-      id: `j-${Date.now().toString().slice(-4)}`,
-      name: name.trim(),
-      type: type.toLowerCase(),
-      default_debit_account_id: debitAccId,
-      default_credit_account_id: creditAccId,
-      created_at: new Date().toISOString()
-    };
-    inMemoryStore.journals.push(newJournal);
-
-    return res.status(201).json({
-      success: true,
-      data: {
-        id: newJournal.id,
-        name: newJournal.name,
-        type: newJournal.type,
-        defaultDebitAccountId: newJournal.default_debit_account_id,
-        defaultCreditAccountId: newJournal.default_credit_account_id,
-        createdAt: newJournal.created_at
-      },
-      error: null
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: {
+        code: 'DB_ERROR',
+        message: 'Failed to create journal'
+      }
     });
   }
 }
@@ -191,29 +164,6 @@ export async function updateJournal(req, res) {
     `;
     const result = await query(updateSql, [name.trim(), type.toLowerCase(), debitAccId, creditAccId, id]);
 
-    if (result.rows.length === 0) {
-      // Check in memory store fallback
-      const idx = inMemoryStore.journals.findIndex(j => j.id === id);
-      if (idx !== -1) {
-        const mem = inMemoryStore.journals[idx];
-        mem.name = name.trim();
-        mem.type = type.toLowerCase();
-        mem.default_debit_account_id = debitAccId;
-        mem.default_credit_account_id = creditAccId;
-        return res.json({
-          success: true,
-          data: {
-            id: mem.id,
-            name: mem.name,
-            type: mem.type,
-            defaultDebitAccountId: mem.default_debit_account_id,
-            defaultCreditAccountId: mem.default_credit_account_id,
-            createdAt: mem.created_at
-          },
-          error: null
-        });
-      }
-
       return res.status(404).json({
         success: false,
         data: null,
@@ -252,22 +202,6 @@ export async function deleteJournal(req, res) {
   try {
     const deleteSql = 'DELETE FROM journals WHERE id = $1 RETURNING id, name;';
     const result = await query(deleteSql, [id]);
-
-    if (result.rows.length === 0) {
-      // Check memory store fallback
-      const idx = inMemoryStore.journals.findIndex(j => j.id === id);
-      if (idx !== -1) {
-        const removed = inMemoryStore.journals.splice(idx, 1)[0];
-        return res.json({
-          success: true,
-          data: {
-            id: removed.id,
-            name: removed.name,
-            message: `Journal '${removed.name}' deleted successfully`
-          },
-          error: null
-        });
-      }
 
       return res.status(404).json({
         success: false,

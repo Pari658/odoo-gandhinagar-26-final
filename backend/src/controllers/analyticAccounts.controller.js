@@ -203,25 +203,29 @@ export async function deleteAnalyticAccount(req, res) {
 export async function getAnalyticBudgets(req, res) {
   const { id } = req.params;
 
-  return res.json({
-    success: true,
-    data: {
-      items: [
-        {
-          id: `b-${id}-01`,
-          name: `Budget for ${id}`,
-          periodStart: '2026-01-01',
-          periodEnd: '2026-12-31',
-          committedAmount: 250000.00,
-          achievedAmount: 48920.00,
-          achievedPercent: 19.57,
-          amountToAchieve: 201080.00
-        }
-      ],
-      page: 1,
-      pageSize: 20,
-      totalCount: 1
-    },
-    error: null
-  });
+  try {
+    return res.json({
+      success: true,
+      data: {
+        items: [
+          {
+            id: `b-${id}-01`,
+            name: `Budget for ${id}`,
+            periodStart: '2026-01-01',
+            periodEnd: '2026-12-31',
+            committedAmount: 250000.00,
+            achievedAmount: 48920.00,
+            achievedPercent: 19.57,
+            amountToAchieve: 201080.00
+          }
+        ],
+        page: 1,
+        pageSize: 20,
+        totalCount: 1
+      },
+      error: null
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, data: null, error: { message: 'Server error' } });
+  }
 }
