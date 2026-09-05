@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import pool from '../config/supabase.js';
+import { query, pool, inMemoryStore } from '../db/index.js';
 import {
   generateAccessToken,
   generateRefreshToken,

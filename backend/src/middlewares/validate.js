@@ -14,9 +14,10 @@ export const validate = (schema) => (req, res, next) => {
     next();
   } catch (err) {
     if (err instanceof ZodError) {
-      const formattedErrors = err.errors.map((e) => {
-        const path = e.path.join('.');
-        return `${path}: ${e.message}`;
+      const issues = err.issues || err.errors || [];
+      const formattedErrors = issues.map((e) => {
+        const path = e.path ? e.path.join('.') : '';
+        return path ? `${path}: ${e.message}` : e.message;
       });
 
       return res.status(400).json({
@@ -24,7 +25,7 @@ export const validate = (schema) => (req, res, next) => {
         data: null,
         error: {
           code: 'VALIDATION_ERROR',
-          message: 'Invalid request data',
+          message: formattedErrors.join(', ') || 'Invalid request data',
           details: formattedErrors
         }
       });
