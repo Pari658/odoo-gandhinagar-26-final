@@ -118,10 +118,8 @@ export async function login(req, res) {
       },
       error: null
     });
-  } catch (err) {
-    return res.status(500).json({ success: false, data: null, error: { code: 'SERVER_ERROR', message: err.message } });
-  }
 }
+
 
 /**
  * Signup Endpoint - Optimized Single Query Duplicate Check & Direct DB Insertion
@@ -242,6 +240,7 @@ export async function signup(req, res) {
          RETURNING id, login_id, email, role, created_at`,
         [cleanLoginId, cleanEmail, passwordHash]
       );
+      createdUser = userInsertRes.rows[0];
 
     const contactRes = await client.query(
       `INSERT INTO contacts (user_id, name, type, email, is_archived, created_at, updated_at)
@@ -281,11 +280,12 @@ export async function signup(req, res) {
     client.release();
   }
 }
+}
 
 export async function refresh(req, res) {
   const { refreshToken } = req.body;
 
-  if (!refreshToken || !inMemoryStore.refreshTokens.has(refreshToken)) {
+  if (!refreshToken || !refreshTokens.has(refreshToken)) {
     return res.status(401).json({
       success: false,
       // data: null,
@@ -297,7 +297,7 @@ export async function refresh(req, res) {
   }
 
   try {
-    const decoded = await verifyRefreshToken(token);
+    const decoded = await verifyRefreshToken(refreshToken);
     const newAccessToken = generateAccessToken(decoded);
     return res.json({ success: true, data: { accessToken: newAccessToken }, error: null });
   } catch (err) {
