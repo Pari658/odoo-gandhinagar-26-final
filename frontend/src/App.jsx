@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Navbar from './components/Navbar.jsx';
+import Sidebar from './components/Sidebar.jsx';
 import ContactsModule from './components/ContactsModule.jsx';
 import ProductsModule from './components/ProductsModule.jsx';
 import AccountsModule from './components/AccountsModule.jsx';
@@ -25,7 +25,9 @@ import {
   Scale, 
   LayoutDashboard,
   ShoppingCart,
-  FileText
+  FileText,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 export default function App() {
@@ -83,10 +85,10 @@ export default function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#FAF6EE] dark:bg-[#120E0C] text-[#2C221E] dark:text-[#F5EFE6] transition-colors duration-200">
-      <Navbar theme={theme} toggleTheme={toggleTheme} activeTab={activeTab} setActiveTab={setActiveTab} />
+    <div className="min-h-screen bg-[#FAF6EE] dark:bg-[#120E0C] text-[#2C221E] dark:text-[#F5EFE6] transition-colors duration-200 flex flex-col md:flex-row">
+      <Sidebar theme={theme} toggleTheme={toggleTheme} activeTab={activeTab} setActiveTab={setActiveTab} allTabs={allTabs} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <main className="flex-1 w-full max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 space-y-6 md:h-screen overflow-y-auto">
         
         {/* Module Status Header */}
         <div className="p-4 rounded-xl border border-[#E6DFD5] dark:border-[#382D27] bg-white dark:bg-[#1C1613] shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -131,6 +133,26 @@ export default function App() {
               </button>
             );
           })}
+        </div>
+
+        {/* Top Action Bar */}
+        <div className="flex items-center justify-end">
+          <button
+            onClick={toggleTheme}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#E6DFD5] dark:border-[#382D27] bg-white dark:bg-[#1C1613] text-xs font-semibold text-[#2C221E] dark:text-[#F5EFE6] hover:bg-[#FAF6EE] dark:hover:bg-[#29211D] transition-all cursor-pointer shadow-sm"
+          >
+            {theme === 'dark' ? (
+              <>
+                <Sun className="w-3.5 h-3.5 text-amber-400" />
+                <span>Light</span>
+              </>
+            ) : (
+              <>
+                <Moon className="w-3.5 h-3.5 text-[#786C62]" />
+                <span>Dark</span>
+              </>
+            )}
+          </button>
         </div>
 
         {/* Active Module Panel */}
