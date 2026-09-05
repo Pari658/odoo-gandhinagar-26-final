@@ -27,8 +27,8 @@ export const masterDataSchema = {
       body: z.object({
         name: z.string().min(1, 'Name is required'),
         type: z.enum(['sales', 'purchase', 'bank', 'cash']),
-        defaultDebitAccountId: z.string().uuid().optional().nullable(),
-        defaultCreditAccountId: z.string().uuid().optional().nullable()
+        defaultDebitAccountId: z.string().optional().nullable(),
+        defaultCreditAccountId: z.string().optional().nullable()
       })
     }),
     update: z.object({
@@ -36,8 +36,8 @@ export const masterDataSchema = {
       body: z.object({
         name: z.string().min(1).optional(),
         type: z.enum(['sales', 'purchase', 'bank', 'cash']).optional(),
-        defaultDebitAccountId: z.string().uuid().optional().nullable(),
-        defaultCreditAccountId: z.string().uuid().optional().nullable()
+        defaultDebitAccountId: z.string().optional().nullable(),
+        defaultCreditAccountId: z.string().optional().nullable()
       })
     }),
     getById: commonSchema.uuidParam,
@@ -49,7 +49,7 @@ export const masterDataSchema = {
       body: z.object({
         name: z.string().min(1, 'Name is required'),
         ratePercent: z.number().min(0, 'Rate percent must be at least 0'),
-        linkedAccountId: z.string().uuid().optional().nullable()
+        linkedAccountId: z.string().optional().nullable()
       })
     }),
     update: z.object({
@@ -57,7 +57,7 @@ export const masterDataSchema = {
       body: z.object({
         name: z.string().min(1).optional(),
         ratePercent: z.number().min(0).optional(),
-        linkedAccountId: z.string().uuid().optional().nullable()
+        linkedAccountId: z.string().optional().nullable()
       })
     }),
     getById: commonSchema.uuidParam,
