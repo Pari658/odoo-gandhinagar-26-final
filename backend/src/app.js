@@ -57,6 +57,7 @@ app.use(['/api/v1/sales-orders', '/api/sales-orders', '/sales-orders'], salesOrd
 app.use(['/api/v1/customer-invoices', '/api/customer-invoices', '/customer-invoices'], customerInvoicesRoutes);
 app.use(['/api/v1/reports', '/api/reports', '/reports'], reportsRoutes);
 app.use(['/api/v1/budgets', '/api/budgets', '/budgets'], budgetsRoutes);
+app.use(['/api/v1/customer-invoices', '/api/customer-invoices', '/customer-invoices'], customerInvoicesRoutes);
 
 // ---------------------------------------------------------------------------
 

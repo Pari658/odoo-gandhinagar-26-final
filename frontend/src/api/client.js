@@ -61,6 +61,7 @@ export async function apiRequest(method, endpoint, body = null, token = null) {
       const err = new Error(json.error?.message || 'API request failed');
       err.code = json.error?.code || 'API_ERROR';
       err.field = json.error?.field || null;
+      err.details = json.error?.details || null;
       throw err;
     }
 

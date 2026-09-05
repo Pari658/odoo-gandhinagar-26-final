@@ -26,30 +26,19 @@ export default function PaymentModal({ document, type = 'outbound', onClose, onS
     setLoading(true);
     setError(null);
     try {
-      // 1. Create Draft Payment
       const paymentPayload = {
         direction: type,
         partnerId: type === 'outbound' ? document.vendorId : document.customerId,
+        vendorBillId: type === 'outbound' ? document.id : null,
+        customerInvoiceId: type === 'inbound' ? document.id : null,
         amount: Number(paymentData.amount),
         method: paymentData.method,
         paymentDate: paymentData.paymentDate,
         note: paymentData.note
       };
 
-      if (type === 'outbound') {
-        paymentPayload.vendorBillId = document.id;
-      } else {
-        paymentPayload.customerInvoiceId = document.id;
-      }
-
-      const createdPayment = await apiRequest('POST', '/payments', paymentPayload);
-
-      // 2. Automatically confirm the payment to post ledger entries & update bill status to paid / partially_paid
-      if (createdPayment && createdPayment.id) {
-        await apiRequest('POST', `/payments/${createdPayment.id}/confirm`);
-      }
-
-      if (onSuccess) onSuccess();
+      await apiRequest('POST', '/payments', paymentPayload);
+      onSuccess();
     } catch (err) {
       setError(err.message || 'Failed to process payment');
     } finally {
