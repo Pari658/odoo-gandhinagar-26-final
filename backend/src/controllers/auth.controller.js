@@ -15,46 +15,86 @@ export async function login(req, res) {
 
   if (!loginInput || !password) {
     return res.status(400).json({
-      success: false, data: null,
-      error: { code: 'VALIDATION_ERROR', message: 'Login Id and password are required' }
+      success: false,
+      // data: null,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Login Id and password are required',
+        field: !loginInput ? 'loginId' : 'password'
+      }
     });
   }
 
+  let user = null;
+  let linkedContact = null;
+
+  // 1. Single JOIN Query: Fetch User + Linked Contact in 1 DB Roundtrip
   try {
-    const dbRes = await pool.query(
-      `SELECT id, login_id, email, password_hash, role, is_active, created_at
-       FROM users
-       WHERE LOWER(email) = LOWER($1) OR LOWER(login_id) = LOWER($1)`,
+    const dbRes = await query(
+      `SELECT u.id, u.login_id, u.email, u.password_hash, u.role, u.is_active, u.created_at,
+              c.id AS contact_id, c.name AS contact_name, c.type AS contact_type
+       FROM users u
+       LEFT JOIN contacts c ON c.user_id = u.id OR LOWER(c.email) = LOWER(u.email)
+       WHERE LOWER(u.email) = LOWER($1) OR LOWER(u.login_id) = LOWER($1)
+       LIMIT 1`,
       [loginInput.trim()]
     );
-
-    if (dbRes.rows.length === 0) {
-      return res.status(401).json({ success: false, data: null, error: { code: 'UNAUTHORIZED', message: 'Invalid Login Id or Password' } });
+    if (dbRes && dbRes.rows && dbRes.rows.length > 0) {
+      const row = dbRes.rows[0];
+      user = {
+        id: row.id,
+        login_id: row.login_id,
+        email: row.email,
+        password_hash: row.password_hash,
+        role: row.role,
+        is_active: row.is_active,
+        created_at: row.created_at
+      };
+      if (row.contact_id) {
+        linkedContact = {
+          id: row.contact_id,
+          name: row.contact_name,
+          type: row.contact_type
+        };
+      }
     }
+  } catch (err) {
+    console.warn('Supabase DB user query warning:', err.message);
+  }
 
-    const user = dbRes.rows[0];
-
-    if (!bcrypt.compareSync(password, user.password_hash)) {
-      return res.status(401).json({ success: false, data: null, error: { code: 'UNAUTHORIZED', message: 'Invalid Login Id or Password' } });
-    }
-
-    let linkedContact = null;
-    const contactRes = await pool.query(
-      'SELECT id, user_id, name, type, email FROM contacts WHERE user_id = $1 OR LOWER(email) = LOWER($2)',
-      [user.id, user.email]
+  // 2. Fallback to inMemoryStore if not found in DB
+  if (!user) {
+    user = inMemoryStore.users.find(u =>
+      u.email?.toLowerCase() === loginInput.trim().toLowerCase() ||
+      u.login_id?.toLowerCase() === loginInput.trim().toLowerCase()
     );
-    if (contactRes.rows.length > 0) {
-      linkedContact = contactRes.rows[0];
-    }
+  }
 
-    const tokenUserPayload = {
-      id: user.id,
-      loginId: user.login_id || user.email.split('@')[0],
-      email: user.email,
-      role: user.role,
-      contactId: linkedContact ? linkedContact.id : null,
-      contactType: linkedContact ? linkedContact.type : null
-    };
+  // 3. Verify password
+  if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+    return res.status(401).json({
+      success: false,
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'Invalid Login Id or Password'
+      }
+    });
+  }
+
+  if (!linkedContact) {
+    linkedContact = inMemoryStore.contacts.find(c =>
+      c.id === user.contact_id || c.email?.toLowerCase() === user.email.toLowerCase()
+    );
+  }
+
+  const tokenUserPayload = {
+    id: user.id,
+    loginId: user.login_id,
+    email: user.email,
+    role: user.role,
+    contactId: user.contact_id || (linkedContact ? linkedContact.id : null),
+    contactType: linkedContact ? linkedContact.type : null
+  };
 
     const accessToken = generateAccessToken(tokenUserPayload);
     const refreshToken = generateRefreshToken(tokenUserPayload);
@@ -83,35 +123,125 @@ export async function login(req, res) {
   }
 }
 
+/**
+ * Signup Endpoint - Optimized Single Query Duplicate Check & Direct DB Insertion
+ */
 export async function signup(req, res) {
-  const { name, loginId, email, password, confirmPassword, role } = req.body;
+  const { name, loginId, email, password, role } = req.body;
 
   const cleanLoginId = (loginId || '').trim();
   if (!cleanLoginId || cleanLoginId.length < 6 || cleanLoginId.length > 12) {
-    return res.status(400).json({ success: false, data: null, error: { code: 'VALIDATION_ERROR', message: 'Invalid loginId' } });
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Login Id Should be unique and must be in between 6-12 characters.',
+        field: 'loginId'
+      }
+    });
   }
   const cleanEmail = (email || '').trim();
   if (!cleanEmail || !cleanEmail.includes('@')) {
-    return res.status(400).json({ success: false, data: null, error: { code: 'VALIDATION_ERROR', message: 'Invalid email' } });
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'A valid Email Id is required',
+        field: 'email'
+      }
+    });
   }
 
-  const client = await pool.connect();
+  // 3. Password Check
+  if (!password || password.length <= 8) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Password must be more than 8 characters',
+        field: 'password'
+      }
+    });
+  }
+
+  // 4. Single SQL Query Duplicate Check (Checks Login ID & Email in 1 DB Roundtrip)
   try {
-    const dupCheck = await client.query('SELECT id FROM users WHERE LOWER(login_id) = LOWER($1) OR LOWER(email) = LOWER($2)', [cleanLoginId, cleanEmail]);
-    if (dupCheck.rows.length > 0) {
-      return res.status(409).json({ success: false, data: null, error: { code: 'CONFLICT', message: 'User already exists' } });
-    }
-
-    await client.query('BEGIN');
-    const passwordHash = bcrypt.hashSync(password, 10);
-    const userRole = role && ['customer', 'vendor', 'both'].includes(role) ? role : 'customer';
-
-    const userRes = await client.query(
-      `INSERT INTO users (login_id, email, password_hash, role, is_active, created_at, updated_at)
-       VALUES ($1, $2, $3, 'contact', true, NOW(), NOW()) RETURNING id, login_id, email`,
-      [cleanLoginId, cleanEmail, passwordHash]
+    const dupRes = await query(
+      'SELECT login_id, email FROM users WHERE LOWER(login_id) = LOWER($1) OR LOWER(email) = LOWER($2)',
+      [cleanLoginId, cleanEmail]
     );
-    const createdUser = userRes.rows[0];
+    if (dupRes && dupRes.rows && dupRes.rows.length > 0) {
+      for (const row of dupRes.rows) {
+        if (row.login_id?.toLowerCase() === cleanLoginId.toLowerCase()) {
+          return res.status(409).json({
+            success: false,
+            error: {
+              code: 'CONFLICT',
+              message: 'Login Id should be unique and already exists in database',
+              field: 'loginId'
+            }
+          });
+        }
+        if (row.email?.toLowerCase() === cleanEmail.toLowerCase()) {
+          return res.status(409).json({
+            success: false,
+            error: {
+              code: 'CONFLICT',
+              message: 'Email Id should not be a duplicate in database',
+              field: 'email'
+            }
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Duplicate check warning:', e.message);
+  }
+
+  const memDupLogin = inMemoryStore.users.find(u => u.login_id?.toLowerCase() === cleanLoginId.toLowerCase());
+  if (memDupLogin) {
+    return res.status(409).json({
+      success: false,
+      error: {
+        code: 'CONFLICT',
+        message: 'Login Id should be unique and already exists in database',
+        field: 'loginId'
+      }
+    });
+  }
+
+  const memDupEmail = inMemoryStore.users.find(u => u.email.toLowerCase() === cleanEmail.toLowerCase());
+  if (memDupEmail) {
+    return res.status(409).json({
+      success: false,
+      error: {
+        code: 'CONFLICT',
+        message: 'Email Id should not be a duplicate in database',
+        field: 'email'
+      }
+    });
+  }
+
+  const userRole = role && ['customer', 'vendor', 'both'].includes(role) ? role : 'customer';
+  const passwordHash = bcrypt.hashSync(password, 10);
+  const contactName = name && name.trim() ? name.trim() : cleanLoginId;
+
+  let createdUser = null;
+  let createdContact = null;
+
+  // 6. SQL INSERT Into Supabase PostgreSQL Database — wrapped in a transaction
+  const client = await pool.connect().catch(() => null);
+
+  if (client) {
+    try {
+      await client.query('BEGIN');
+
+      const userInsertRes = await client.query(
+        `INSERT INTO users (login_id, email, password_hash, role, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, 'contact', true, NOW(), NOW())
+         RETURNING id, login_id, email, role, created_at`,
+        [cleanLoginId, cleanEmail, passwordHash]
+      );
 
     const contactRes = await client.query(
       `INSERT INTO contacts (user_id, name, type, email, is_archived, created_at, updated_at)
@@ -153,9 +283,17 @@ export async function signup(req, res) {
 }
 
 export async function refresh(req, res) {
-  const { refreshToken: token } = req.body;
-  if (!token || !refreshTokens.has(token)) {
-    return res.status(401).json({ success: false, data: null, error: { code: 'UNAUTHORIZED', message: 'Invalid refresh token' } });
+  const { refreshToken } = req.body;
+
+  if (!refreshToken || !inMemoryStore.refreshTokens.has(refreshToken)) {
+    return res.status(401).json({
+      success: false,
+      // data: null,
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'Invalid or revoked refresh token'
+      }
+    });
   }
 
   try {
@@ -163,7 +301,14 @@ export async function refresh(req, res) {
     const newAccessToken = generateAccessToken(decoded);
     return res.json({ success: true, data: { accessToken: newAccessToken }, error: null });
   } catch (err) {
-    return res.status(401).json({ success: false, data: null, error: { code: 'UNAUTHORIZED', message: 'Expired refresh token' } });
+    return res.status(401).json({
+      success: false,
+      // data: null,
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'Expired or invalid refresh token'
+      }
+    });
   }
 }
 
