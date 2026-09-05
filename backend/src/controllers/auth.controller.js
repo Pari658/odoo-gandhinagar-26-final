@@ -16,7 +16,7 @@ export async function login(req, res) {
   if (!loginInput || !password) {
     return res.status(400).json({
       success: false,
-      data: null,
+      // data: null,
       error: {
         code: 'VALIDATION_ERROR',
         message: 'Login Id and password are required',
@@ -26,17 +26,37 @@ export async function login(req, res) {
   }
 
   let user = null;
+  let linkedContact = null;
 
-  // 1. Try querying Supabase PostgreSQL
+  // 1. Single JOIN Query: Fetch User + Linked Contact in 1 DB Roundtrip
   try {
     const dbRes = await query(
-      `SELECT id, login_id, email, password_hash, role,  is_active, created_at
-       FROM users
-       WHERE LOWER(email) = LOWER($1) OR LOWER(login_id) = LOWER($1)`,
+      `SELECT u.id, u.login_id, u.email, u.password_hash, u.role, u.is_active, u.created_at,
+              c.id AS contact_id, c.name AS contact_name, c.type AS contact_type
+       FROM users u
+       LEFT JOIN contacts c ON c.user_id = u.id OR LOWER(c.email) = LOWER(u.email)
+       WHERE LOWER(u.email) = LOWER($1) OR LOWER(u.login_id) = LOWER($1)
+       LIMIT 1`,
       [loginInput.trim()]
     );
     if (dbRes && dbRes.rows && dbRes.rows.length > 0) {
-      user = dbRes.rows[0];
+      const row = dbRes.rows[0];
+      user = {
+        id: row.id,
+        login_id: row.login_id,
+        email: row.email,
+        password_hash: row.password_hash,
+        role: row.role,
+        is_active: row.is_active,
+        created_at: row.created_at
+      };
+      if (row.contact_id) {
+        linkedContact = {
+          id: row.contact_id,
+          name: row.contact_name,
+          type: row.contact_type
+        };
+      }
     }
   } catch (err) {
     console.warn('Supabase DB user query warning:', err.message);
@@ -54,26 +74,11 @@ export async function login(req, res) {
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
     return res.status(401).json({
       success: false,
-      data: null,
       error: {
         code: 'UNAUTHORIZED',
         message: 'Invalid Login Id or Password'
       }
     });
-  }
-
-  // 4. Find linked contact from Supabase DB or store
-  let linkedContact = null;
-  try {
-    const contactRes = await query(
-      'SELECT id, user_id, name, type, email FROM contacts WHERE user_id = $1 OR LOWER(email) = LOWER($2)',
-      [user.id, user.email]
-    );
-    if (contactRes && contactRes.rows && contactRes.rows.length > 0) {
-      linkedContact = contactRes.rows[0];
-    }
-  } catch (e) {
-    console.warn('Contact lookup warning:', e.message);
   }
 
   if (!linkedContact) {
@@ -84,7 +89,7 @@ export async function login(req, res) {
 
   const tokenUserPayload = {
     id: user.id,
-    loginId: user.login_id || user.email.split('@')[0],
+    loginId: user.login_id,
     email: user.email,
     role: user.role,
     contactId: user.contact_id || (linkedContact ? linkedContact.id : null),
@@ -116,17 +121,16 @@ export async function login(req, res) {
 }
 
 /**
- * Signup Endpoint - Inserts directly into Supabase PostgreSQL database
+ * Signup Endpoint - Optimized Single Query Duplicate Check & Direct DB Insertion
  */
 export async function signup(req, res) {
-  const { name, loginId, email, password, confirmPassword, role } = req.body;
+  const { name, loginId, email, password, role } = req.body;
 
   // 1. Login Id Validation: 6-12 characters
   const cleanLoginId = (loginId || '').trim();
   if (!cleanLoginId || cleanLoginId.length < 6 || cleanLoginId.length > 12) {
     return res.status(400).json({
       success: false,
-      data: null,
       error: {
         code: 'VALIDATION_ERROR',
         message: 'Login Id Should be unique and must be in between 6-12 characters.',
@@ -140,7 +144,6 @@ export async function signup(req, res) {
   if (!cleanEmail || !cleanEmail.includes('@')) {
     return res.status(400).json({
       success: false,
-      data: null,
       error: {
         code: 'VALIDATION_ERROR',
         message: 'A valid Email Id is required',
@@ -149,59 +152,56 @@ export async function signup(req, res) {
     });
   }
 
-  // 3. Password Complexity: small case, large case, special char, length > 8
-  const hasSmall = /[a-z]/.test(password || '');
-  const hasLarge = /[A-Z]/.test(password || '');
-  const hasSpecial = /[^A-Za-z0-9]/.test(password || '');
-  const isMoreThan8 = (password || '').length > 8;
-
-  if (!password || !hasSmall || !hasLarge || !hasSpecial || !isMoreThan8) {
+  // 3. Password Check
+  if (!password || password.length <= 8) {
     return res.status(400).json({
       success: false,
-      data: null,
       error: {
         code: 'VALIDATION_ERROR',
-        message: 'password must be unique and must contain a small case, a large case and a special character and length should be more than 8 characters',
+        message: 'Password must be more than 8 characters',
         field: 'password'
       }
     });
   }
 
-  if (confirmPassword && password !== confirmPassword) {
-    return res.status(400).json({
-      success: false,
-      data: null,
-      error: {
-        code: 'VALIDATION_ERROR',
-        message: 'Passwords do not match',
-        field: 'confirmPassword'
-      }
-    });
-  }
-
-  // 4. Check Duplicate Login ID in Supabase DB & store
+  // 4. Single SQL Query Duplicate Check (Checks Login ID & Email in 1 DB Roundtrip)
   try {
-    const dupLoginRes = await query('SELECT id FROM users WHERE LOWER(login_id) = LOWER($1)', [cleanLoginId]);
-    if (dupLoginRes && dupLoginRes.rows && dupLoginRes.rows.length > 0) {
-      return res.status(409).json({
-        success: false,
-        data: null,
-        error: {
-          code: 'CONFLICT',
-          message: 'Login Id should be unique and already exists in database',
-          field: 'loginId'
+    const dupRes = await query(
+      'SELECT login_id, email FROM users WHERE LOWER(login_id) = LOWER($1) OR LOWER(email) = LOWER($2)',
+      [cleanLoginId, cleanEmail]
+    );
+    if (dupRes && dupRes.rows && dupRes.rows.length > 0) {
+      for (const row of dupRes.rows) {
+        if (row.login_id?.toLowerCase() === cleanLoginId.toLowerCase()) {
+          return res.status(409).json({
+            success: false,
+            error: {
+              code: 'CONFLICT',
+              message: 'Login Id should be unique and already exists in database',
+              field: 'loginId'
+            }
+          });
         }
-      });
+        if (row.email?.toLowerCase() === cleanEmail.toLowerCase()) {
+          return res.status(409).json({
+            success: false,
+            error: {
+              code: 'CONFLICT',
+              message: 'Email Id should not be a duplicate in database',
+              field: 'email'
+            }
+          });
+        }
+      }
     }
   } catch (e) {
-    console.warn('Duplicate login check warning:', e.message);
+    console.warn('Duplicate check warning:', e.message);
   }
 
   const memDupLogin = inMemoryStore.users.find(u => u.login_id?.toLowerCase() === cleanLoginId.toLowerCase());
   if (memDupLogin) {
     return res.status(409).json({
       success: false,
-      data: null,
       error: {
         code: 'CONFLICT',
         message: 'Login Id should be unique and already exists in database',
@@ -210,29 +210,10 @@ export async function signup(req, res) {
     });
   }
 
-  // 5. Check Duplicate Email in Supabase DB & store
-  try {
-    const dupEmailRes = await query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
-    if (dupEmailRes && dupEmailRes.rows && dupEmailRes.rows.length > 0) {
-      return res.status(409).json({
-        success: false,
-        data: null,
-        error: {
-          code: 'CONFLICT',
-          message: 'Email Id should not be a duplicate in database',
-          field: 'email'
-        }
-      });
-    }
-  } catch (e) {
-    console.warn('Duplicate email check warning:', e.message);
-  }
-
   const memDupEmail = inMemoryStore.users.find(u => u.email.toLowerCase() === cleanEmail.toLowerCase());
   if (memDupEmail) {
     return res.status(409).json({
       success: false,
-      data: null,
       error: {
         code: 'CONFLICT',
         message: 'Email Id should not be a duplicate in database',
@@ -371,7 +352,7 @@ export async function refresh(req, res) {
   if (!refreshToken || !inMemoryStore.refreshTokens.has(refreshToken)) {
     return res.status(401).json({
       success: false,
-      data: null,
+      // data: null,
       error: {
         code: 'UNAUTHORIZED',
         message: 'Invalid or revoked refresh token'
@@ -393,7 +374,7 @@ export async function refresh(req, res) {
   } catch (err) {
     return res.status(401).json({
       success: false,
-      data: null,
+      // data: null,
       error: {
         code: 'UNAUTHORIZED',
         message: 'Expired or invalid refresh token'
