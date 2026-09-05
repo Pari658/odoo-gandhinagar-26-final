@@ -1,24 +1,37 @@
-import { inMemoryStore } from '../db/index.js';
+import { pool } from '../config/supabase.js';
 
 export async function getAnalyticAccounts(req, res) {
   const { type } = req.query;
 
-  let items = [...inMemoryStore.analytic_accounts];
-  if (type) {
-    items = items.filter(a => a.type === type);
+  try {
+    let query = 'SELECT id, name, type FROM analytic_accounts';
+    const params = [];
+    
+    if (type) {
+      query += ' WHERE type = $1';
+      params.push(type);
+    }
+    
+    query += ' ORDER BY name ASC';
+    
+    const result = await pool.query(query, params);
+
+    return res.json({
+      success: true,
+      data: result.rows,
+      error: null
+    });
+  } catch (error) {
+    console.error('Error fetching analytic accounts:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: {
+        code: 'DB_ERROR',
+        message: 'Failed to fetch analytic accounts'
+      }
+    });
   }
-
-  const formatted = items.map(a => ({
-    id: a.id,
-    name: a.name,
-    type: a.type
-  }));
-
-  return res.json({
-    success: true,
-    data: formatted,
-    error: null
-  });
 }
 
 export async function createAnalyticAccount(req, res) {
@@ -36,43 +49,59 @@ export async function createAnalyticAccount(req, res) {
     });
   }
 
-  const newAnalytic = {
-    id: `aa-${Date.now().toString().slice(-4)}`,
-    name,
-    type
-  };
+  try {
+    const result = await pool.query(
+      'INSERT INTO analytic_accounts (name, type) VALUES ($1, $2) RETURNING id, name, type',
+      [name, type]
+    );
 
-  inMemoryStore.analytic_accounts.push(newAnalytic);
-
-  return res.status(201).json({
-    success: true,
-    data: newAnalytic,
-    error: null
-  });
+    return res.status(201).json({
+      success: true,
+      data: result.rows[0],
+      error: null
+    });
+  } catch (error) {
+    console.error('Error creating analytic account:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: {
+        code: 'DB_ERROR',
+        message: 'Failed to create analytic account'
+      }
+    });
+  }
 }
 
 export async function getAnalyticBudgets(req, res) {
   const { id } = req.params;
 
-  return res.json({
-    success: true,
-    data: {
-      items: [
-        {
-          id: `b-${id}-01`,
-          name: `Budget for ${id}`,
-          periodStart: '2026-01-01',
-          periodEnd: '2026-12-31',
-          committedAmount: 250000.00,
-          achievedAmount: 48920.00,
-          achievedPercent: 19.57,
-          amountToAchieve: 201080.00
-        }
-      ],
-      page: 1,
-      pageSize: 20,
-      totalCount: 1
-    },
-    error: null
-  });
+  try {
+    // For now, return the mock data if budgets table is not fully populated/implemented.
+    // If you have a budget table, you could query it here. We'll use a placeholder for now
+    // based on the previous mock data since the user didn't mention migrating budgets specifically.
+    return res.json({
+      success: true,
+      data: {
+        items: [
+          {
+            id: `b-${id}-01`,
+            name: `Budget for ${id}`,
+            periodStart: '2026-01-01',
+            periodEnd: '2026-12-31',
+            committedAmount: 250000.00,
+            achievedAmount: 48920.00,
+            achievedPercent: 19.57,
+            amountToAchieve: 201080.00
+          }
+        ],
+        page: 1,
+        pageSize: 20,
+        totalCount: 1
+      },
+      error: null
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, data: null, error: { message: 'Server error' } });
+  }
 }
