@@ -30,7 +30,11 @@ export async function login(req, res) {
   // 1. Try querying Supabase PostgreSQL
   try {
     const dbRes = await query(
+<<<<<<< HEAD
       `SELECT id, login_id, email, password_hash, role, is_active, created_at
+=======
+      `SELECT id, login_id, email, password_hash, role,  is_active, created_at
+>>>>>>> cf19ff37cdfccbf095f60199c6d7a458525163a0
        FROM users
        WHERE LOWER(email) = LOWER($1) OR LOWER(login_id) = LOWER($1)`,
       [loginInput.trim()]
