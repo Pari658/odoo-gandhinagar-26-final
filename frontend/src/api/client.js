@@ -3,7 +3,7 @@
  * Envelope: { success: boolean, data: object|array|null, error: object|null }
  */
 
-const API_BASE = '/api/v1';
+const API_BASE = 'http://localhost:5000/api/v1';
 
 export async function apiRequest(method, endpoint, body = null, token = null) {
   const headers = {
