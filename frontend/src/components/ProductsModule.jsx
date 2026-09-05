@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import { Package, Plus, Search, Tag, DollarSign, Layers } from 'lucide-react';
+import { Package, Plus, Search, Tag, DollarSign, Layers, LayoutGrid, List } from 'lucide-react';
 import ProductForm from './ProductForm.jsx';
 import ProductDetail from './ProductDetail.jsx';
 
 export default function ProductsModule() {
   const { user } = useAuth();
   const [view, setView] = useState('list'); // 'list' | 'detail'
+  const [displayMode, setDisplayMode] = useState('kanban'); // 'kanban' (grid) | 'table'
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -160,11 +161,80 @@ export default function ProductsModule() {
                 <option key={idx} value={cat}>{cat}</option>
               ))}
             </select>
+
+            {/* View Toggles */}
+            <div className="flex items-center bg-[#FAF6EE] dark:bg-[#29211D] rounded-lg border border-[#E6DFD5] dark:border-[#382D27] p-1">
+              <button
+                onClick={() => setDisplayMode('table')}
+                className={`p-1.5 rounded-md transition-colors cursor-pointer ${displayMode === 'table' ? 'bg-white dark:bg-[#1C1613] shadow-sm text-[#B45309]' : 'text-[#6B5E55] hover:text-[#2C221E] dark:hover:text-[#F5EFE6]'}`}
+                title="List View"
+              >
+                <List className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setDisplayMode('kanban')}
+                className={`p-1.5 rounded-md transition-colors cursor-pointer ${displayMode === 'kanban' ? 'bg-white dark:bg-[#1C1613] shadow-sm text-[#B45309]' : 'text-[#6B5E55] hover:text-[#2C221E] dark:hover:text-[#F5EFE6]'}`}
+                title="Kanban/Grid View"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
-          {/* Products Grid */}
+          {/* Products Display */}
           {loading ? (
             <div className="text-center py-12 text-xs text-[#6B5E55]">Loading Products...</div>
+          ) : products.length === 0 ? (
+            <div className="text-center py-12 text-xs text-[#6B5E55]">No products found.</div>
+          ) : displayMode === 'table' ? (
+            <div className="bg-white dark:bg-[#1C1613] rounded-xl border border-[#E6DFD5] dark:border-[#382D27] overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs whitespace-nowrap">
+                  <thead className="bg-[#FAF6EE] dark:bg-[#29211D] text-[#6B5E55] dark:text-[#A89B91]">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Product Name</th>
+                      <th className="px-4 py-3 font-semibold">Type</th>
+                      <th className="px-4 py-3 font-semibold">Category</th>
+                      <th className="px-4 py-3 font-semibold text-right">Cost Price</th>
+                      <th className="px-4 py-3 font-semibold text-right">Sales Price</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E6DFD5] dark:divide-[#382D27]">
+                    {products.map(p => (
+                      <tr 
+                        key={p.id}
+                        onClick={() => {
+                          setSelectedId(p.id);
+                          setView('detail');
+                        }}
+                        className="hover:bg-[#FAF6EE]/50 dark:hover:bg-[#29211D]/40 cursor-pointer"
+                      >
+                        <td className="px-4 py-3 font-bold text-[#2C221E] dark:text-[#F5EFE6]">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-[#FAF6EE] dark:bg-[#29211D] flex items-center justify-center text-[10px] font-bold text-[#B45309]">
+                              {p.type === 'product' || p.type === 'goods' ? <Package className="w-3.5 h-3.5" /> : <Layers className="w-3.5 h-3.5" />}
+                            </div>
+                            <span className="truncate max-w-[200px] block">{p.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border uppercase ${
+                            p.type === 'service' ? 'bg-purple-50 text-purple-800 border-purple-200' :
+                            p.type === 'combo' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+                            'bg-emerald-50 text-emerald-800 border-emerald-200'
+                          }`}>
+                            {p.type}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-[#6B5E55] dark:text-[#A89B91]">{p.category}</td>
+                        <td className="px-4 py-3 text-right font-mono text-[#6B5E55] dark:text-[#A89B91]">₹{Number(p.costPrice).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400">₹{Number(p.salesPrice).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {products.map(p => (
