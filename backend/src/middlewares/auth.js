@@ -1,9 +1,5 @@
 import jwt from 'jsonwebtoken';
 
-/**
- * Lazily read JWT secrets so dotenv.config() in server.js has time to run
- * before these values are resolved. Fail-fast if secrets are missing.
- */
 function getAccessSecret() {
   const secret = process.env.JWT_ACCESS_SECRET;
   if (!secret) throw new Error('JWT_ACCESS_SECRET env variable is not set');
