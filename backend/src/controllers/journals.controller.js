@@ -227,7 +227,6 @@ export async function deleteJournal(req, res) {
   } catch (err) {
     console.error('Error deleting journal from DB:', err.message);
 
-    // Foreign key violation error code 23503 in PostgreSQL
     if (err.code === '23503') {
       return res.status(400).json({
         success: false,

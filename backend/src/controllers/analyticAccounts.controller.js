@@ -1,5 +1,4 @@
-import pool from '../config/supabase.js';
-import { inMemoryStore } from '../db/index.js';
+import { pool } from '../config/supabase.js';
 
 export async function getAnalyticAccounts(req, res) {
   try {
@@ -7,67 +6,33 @@ export async function getAnalyticAccounts(req, res) {
     let queryText = 'SELECT * FROM analytic_accounts ORDER BY name ASC';
     let params = [];
 
-    if (type) {
-      queryText = 'SELECT * FROM analytic_accounts WHERE type::text = $1 ORDER BY name ASC';
-      params = [type];
-    }
-
-    const dbRes = await pool.query(queryText, params);
-
-    const formatted = dbRes.rows.map(a => ({
-      id: a.id,
-      name: a.name,
-      type: a.type
-    }));
-
-    return res.json({
-      success: true,
-      data: formatted,
-      error: null
-    });
-  } catch (err) {
-    console.error('getAnalyticAccounts error, falling back to inMemoryStore:', err.message);
-    const { type } = req.query;
-    let items = [...inMemoryStore.analytic_accounts];
-    if (type) {
-      items = items.filter(a => a.type === type);
-    }
-    return res.json({
-      success: true,
-      data: items,
-      error: null
-    });
-  }
-}
-
-export async function getAnalyticAccountById(req, res) {
   try {
-    const { id } = req.params;
-    const dbRes = await pool.query('SELECT * FROM analytic_accounts WHERE id = $1', [id]);
-
-    if (dbRes.rowCount === 0) {
-      return res.status(404).json({
-        success: false,
-        data: null,
-        error: { code: 'NOT_FOUND', message: 'Analytic account not found' }
-      });
+    let query = 'SELECT id, name, type FROM analytic_accounts';
+    const params = [];
+    
+    if (type) {
+      query += ' WHERE type = $1';
+      params.push(type);
     }
+    
+    query += ' ORDER BY name ASC';
+    
+    const result = await pool.query(query, params);
 
-    const row = dbRes.rows[0];
     return res.json({
       success: true,
-      data: {
-        id: row.id,
-        name: row.name,
-        type: row.type
-      },
+      data: result.rows,
       error: null
     });
-  } catch (err) {
+  } catch (error) {
+    console.error('Error fetching analytic accounts:', error);
     return res.status(500).json({
       success: false,
       data: null,
-      error: { code: 'SERVER_ERROR', message: err.message }
+      error: {
+        code: 'DB_ERROR',
+        message: 'Failed to fetch analytic accounts'
+      }
     });
   }
 }
@@ -172,30 +137,26 @@ export async function deleteAnalyticAccount(req, res) {
   try {
     const { id } = req.params;
 
-    const dbRes = await pool.query(
-      'DELETE FROM analytic_accounts WHERE id = $1 RETURNING *',
-      [id]
+  try {
+    const result = await pool.query(
+      'INSERT INTO analytic_accounts (name, type) VALUES ($1, $2) RETURNING id, name, type',
+      [name, type]
     );
 
-    if (dbRes.rowCount === 0) {
-      return res.status(404).json({
-        success: false,
-        data: null,
-        error: { code: 'NOT_FOUND', message: 'Analytic account not found' }
-      });
-    }
-
-    return res.json({
+    return res.status(201).json({
       success: true,
-      data: { id, message: 'Analytic account deleted successfully' },
+      data: result.rows[0],
       error: null
     });
-  } catch (err) {
-    console.error('deleteAnalyticAccount error:', err.message);
+  } catch (error) {
+    console.error('Error creating analytic account:', error);
     return res.status(500).json({
       success: false,
       data: null,
-      error: { code: 'SERVER_ERROR', message: err.message }
+      error: {
+        code: 'DB_ERROR',
+        message: 'Failed to create analytic account'
+      }
     });
   }
 }
@@ -204,6 +165,9 @@ export async function getAnalyticBudgets(req, res) {
   const { id } = req.params;
 
   try {
+    // For now, return the mock data if budgets table is not fully populated/implemented.
+    // If you have a budget table, you could query it here. We'll use a placeholder for now
+    // based on the previous mock data since the user didn't mention migrating budgets specifically.
     return res.json({
       success: true,
       data: {

@@ -1,15 +1,12 @@
 import { Router } from 'express';
+import { getCustomerInvoices } from '../controllers/customerInvoices.controller.js';
 import { authenticateToken } from '../middlewares/auth.js';
-import { getMyBills, getCustomerInvoices } from '../controllers/customerInvoices.controller.js';
+import { validate } from '../middlewares/validate.js';
+import { commonSchema } from '../schemas/common.schema.js';
 
 const router = Router();
 
 router.use(authenticateToken);
-
-// Customer Portal Endpoint (Customer can only view their own bills)
-router.get('/my-bills', getMyBills);
-
-// Staff Endpoint
-router.get('/', getCustomerInvoices);
+router.get('/', validate(commonSchema.paginationQuery), getCustomerInvoices);
 
 export default router;

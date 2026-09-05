@@ -8,6 +8,7 @@ import TaxRatesModule from './components/TaxRatesModule.jsx';
 import AnalyticAccountsModule from './components/AnalyticAccountsModule.jsx';
 import PurchaseOrdersModule from './components/PurchaseOrdersModule.jsx';
 import VendorBillsModule from './components/VendorBillsModule.jsx';
+import PaymentsModule from './components/PaymentsModule.jsx';
 import SalesOrdersModule from './components/SalesOrdersModule.jsx';
 import ReportsModule from './components/ReportsModule.jsx';
 import BudgetModule from './components/BudgetModule.jsx';
@@ -22,14 +23,11 @@ import {
   BookMarked, 
   Percent, 
   PieChart, 
-  ShieldCheck, 
   Scale, 
   LayoutDashboard,
   ShoppingCart,
-  Sun,
-  Moon,
   FileText,
-  Wallet
+  CreditCard
 } from 'lucide-react';
 
 export default function App() {
@@ -83,7 +81,7 @@ export default function App() {
     { id: 'tax-rates', label: 'Tax Rates', icon: Percent },
     { id: 'analytic-accounts', label: 'Analytic Accounts', icon: PieChart },
     { id: 'vendor-bills', label: 'Vendor Bills', icon: FileText },
-    { id: 'budget', label: 'Budget', icon: Wallet },
+    { id: 'payments', label: 'Payments', icon: CreditCard },
     { id: 'reports', label: 'Reports & Statements', icon: Scale }
   ] : [
     { id: 'sales-orders', label: 'My Orders', icon: ShoppingCart },
@@ -97,30 +95,6 @@ export default function App() {
 
       <main className="flex-1 w-full max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 space-y-6 md:h-screen overflow-y-auto">
         
-        {/* Top Action Bar */}
-        <div className="flex items-center justify-end">
-          <button
-            onClick={toggleTheme}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#E6DFD5] dark:border-[#382D27] bg-white dark:bg-[#1C1613] text-xs font-semibold text-[#2C221E] dark:text-[#F5EFE6] hover:bg-[#FAF6EE] dark:hover:bg-[#29211D] transition-all cursor-pointer shadow-sm"
-          >
-            {theme === 'dark' ? (
-              <>
-                <Sun className="w-3.5 h-3.5 text-amber-400" />
-                <span>Light</span>
-              </>
-            ) : (
-              <>
-                <Moon className="w-3.5 h-3.5 text-[#786C62]" />
-                <span>Dark</span>
-              </>
-            )}
-          </button>
-            </div>
-
-
-
-
-
         {/* Active Module Panel */}
         <div className="pt-2">
           {activeTab === 'dashboard' && <AdminDashboard onNavigate={setActiveTab} />}
@@ -134,7 +108,7 @@ export default function App() {
           {activeTab === 'analytic-accounts' && <AnalyticAccountsModule />}
           {activeTab === 'purchase-orders' && <PurchaseOrdersModule />}
           {activeTab === 'vendor-bills' && <VendorBillsModule />}
-          {activeTab === 'budget' && <BudgetModule />}
+          {activeTab === 'payments' && <PaymentsModule />}
         </div>
       </main>
     </div>

@@ -67,7 +67,7 @@ export function authenticateToken(req, res, next) {
   if (!token) {
     return res.status(401).json({
       success: false,
-      // data: null,
+      data: null,
       error: {
         code: 'UNAUTHORIZED',
         message: 'Access token missing'
@@ -79,7 +79,7 @@ export function authenticateToken(req, res, next) {
     if (err) {
       return res.status(401).json({
         success: false,
-        // data: null,
+        data: null,
         error: {
           code: 'UNAUTHORIZED',
           message: 'Invalid or expired access token'
@@ -100,7 +100,7 @@ export function requireRole(...allowedRoles) {
     if (!req.user || !allowedRoles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        // data: null,
+        data: null,
         error: {
           code: 'FORBIDDEN',
           message: `Access denied. Required role: ${allowedRoles.join(', ')}`
