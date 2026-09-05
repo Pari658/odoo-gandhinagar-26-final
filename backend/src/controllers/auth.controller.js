@@ -142,12 +142,16 @@ export async function signup(req, res) {
   }
 
   // 3. Password Check
-  if (!password || password.length <= 8) {
+  const hasSmall = /[a-z]/.test(password);
+  const hasLarge = /[A-Z]/.test(password);
+  const hasSpecial = /[^A-Za-z0-9]/.test(password);
+  
+  if (!password || password.length <= 8 || !hasSmall || !hasLarge || !hasSpecial) {
     return res.status(400).json({
       success: false,
       error: {
         code: 'VALIDATION_ERROR',
-        message: 'Password must be more than 8 characters',
+        message: 'password must be unique and must contain a small case, a large case and a special character and length should be more than 8 characters',
         field: 'password'
       }
     });
