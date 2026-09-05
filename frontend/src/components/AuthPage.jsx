@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { Armchair, Key, UserPlus, ArrowRight, CheckCircle2, HelpCircle, ArrowLeft } from 'lucide-react';
+import { Armchair, Key, UserPlus, ArrowRight, CheckCircle2, HelpCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 
 export default function AuthPage({ onBack }) {
   const { login, signup, loading } = useAuth();
@@ -15,6 +15,8 @@ export default function AuthPage({ onBack }) {
   const [email, setEmail] = useState('');           // Email for signup
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [role, setRole] = useState('customer');     // customer | vendor | both
 
   const [errorMsg, setErrorMsg] = useState(null);
@@ -199,14 +201,24 @@ export default function AuthPage({ onBack }) {
                       Forgot Password?
                     </button>
                   </div>
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6] focus:outline-none focus:ring-2 focus:ring-[#B45309]"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      required
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      className="w-full px-3 py-2.5 pr-10 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6] focus:outline-none focus:ring-2 focus:ring-[#B45309]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B5E55] dark:text-[#A89B91] hover:text-[#B45309] cursor-pointer"
+                      title={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
               </>
             )}
@@ -262,17 +274,27 @@ export default function AuthPage({ onBack }) {
                     <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                       Password *
                     </label>
-                    <input
-                      type="password"
-                      required
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={e => {
-                        setPassword(e.target.value);
-                        if (errorMsg) setErrorMsg(null);
-                      }}
-                      className="w-full px-3 py-2.5 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6] focus:outline-none focus:ring-2 focus:ring-[#B45309]"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={e => {
+                          setPassword(e.target.value);
+                          if (errorMsg) setErrorMsg(null);
+                        }}
+                        className="w-full px-3 py-2.5 pr-9 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6] focus:outline-none focus:ring-2 focus:ring-[#B45309]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#6B5E55] dark:text-[#A89B91] hover:text-[#B45309] cursor-pointer"
+                        title={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
                   </div>
 
                   <div>
@@ -286,23 +308,33 @@ export default function AuthPage({ onBack }) {
                         )
                       )}
                     </label>
-                    <input
-                      type="password"
-                      required
-                      placeholder="••••••••"
-                      value={confirmPassword}
-                      onChange={e => {
-                        setConfirmPassword(e.target.value);
-                        if (errorMsg) setErrorMsg(null);
-                      }}
-                      className={`w-full px-3 py-2.5 rounded-lg border bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6] focus:outline-none focus:ring-2 ${
-                        confirmPassword ? (
-                          password === confirmPassword 
-                            ? 'border-emerald-500 focus:ring-emerald-500' 
-                            : 'border-red-500 focus:ring-red-500'
-                        ) : 'border-[#E6DFD5] dark:border-[#382D27] focus:ring-[#B45309]'
-                      }`}
-                    />
+                    <div className="relative">
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        required
+                        placeholder="••••••••"
+                        value={confirmPassword}
+                        onChange={e => {
+                          setConfirmPassword(e.target.value);
+                          if (errorMsg) setErrorMsg(null);
+                        }}
+                        className={`w-full px-3 py-2.5 pr-9 rounded-lg border bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6] focus:outline-none focus:ring-2 ${
+                          confirmPassword ? (
+                            password === confirmPassword 
+                              ? 'border-emerald-500 focus:ring-emerald-500' 
+                              : 'border-red-500 focus:ring-red-500'
+                          ) : 'border-[#E6DFD5] dark:border-[#382D27] focus:ring-[#B45309]'
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#6B5E55] dark:text-[#A89B91] hover:text-[#B45309] cursor-pointer"
+                        title={showConfirmPassword ? "Hide password" : "Show password"}
+                      >
+                        {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
 

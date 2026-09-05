@@ -10,13 +10,15 @@ import {
 
 const router = Router();
 
-// Secure all Sales Order routes (only admin and accountant can manage SOs)
-router.use(authenticateToken, requireRole('admin', 'accountant'));
+router.use(authenticateToken);
 
-router.post('/', handleCreateSalesOrder);
+// Read endpoints (accessible to all authenticated roles including contacts/customers)
 router.get('/', handleGetSalesOrders);
 router.get('/:id', handleGetSalesOrderById);
-router.put('/:id', handleUpdateSalesOrder);
-router.post('/:id/confirm', handleConfirmSalesOrder);
+
+// Mutation endpoints (restricted to admin & accountant roles)
+router.post('/', requireRole('admin', 'accountant'), handleCreateSalesOrder);
+router.put('/:id', requireRole('admin', 'accountant'), handleUpdateSalesOrder);
+router.post('/:id/confirm', requireRole('admin', 'accountant'), handleConfirmSalesOrder);
 
 export default router;

@@ -1,7 +1,10 @@
 import { pool } from '../config/supabase.js';
 
 export async function getAnalyticAccounts(req, res) {
-  const { type } = req.query;
+  try {
+    const { type } = req.query;
+    let queryText = 'SELECT * FROM analytic_accounts ORDER BY name ASC';
+    let params = [];
 
   try {
     let query = 'SELECT id, name, type FROM analytic_accounts';
@@ -35,19 +38,104 @@ export async function getAnalyticAccounts(req, res) {
 }
 
 export async function createAnalyticAccount(req, res) {
-  const { name, type } = req.body;
+  try {
+    const { name, type } = req.body;
 
-  if (!name || !type) {
-    return res.status(400).json({
+    if (!name || !type) {
+      return res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Name and type (income/expense) are required',
+          field: !name ? 'name' : 'type'
+        }
+      });
+    }
+
+    const dbRes = await pool.query(
+      `INSERT INTO analytic_accounts (name, type)
+       VALUES ($1, $2)
+       RETURNING *`,
+      [name, type]
+    );
+
+    const created = dbRes.rows[0];
+
+    return res.status(201).json({
+      success: true,
+      data: {
+        id: created.id,
+        name: created.name,
+        type: created.type
+      },
+      error: null
+    });
+  } catch (err) {
+    console.error('createAnalyticAccount error:', err.message);
+    return res.status(500).json({
       success: false,
       data: null,
-      error: {
-        code: 'VALIDATION_ERROR',
-        message: 'Name and type (income/expense) are required',
-        field: !name ? 'name' : 'type'
-      }
+      error: { code: 'SERVER_ERROR', message: err.message }
     });
   }
+}
+
+export async function updateAnalyticAccount(req, res) {
+  try {
+    const { id } = req.params;
+    const { name, type } = req.body;
+
+    if (!name || !type) {
+      return res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Name and type are required for update'
+        }
+      });
+    }
+
+    const dbRes = await pool.query(
+      `UPDATE analytic_accounts
+       SET name = $1, type = $2
+       WHERE id = $3
+       RETURNING *`,
+      [name, type, id]
+    );
+
+    if (dbRes.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'Analytic account not found' }
+      });
+    }
+
+    const updated = dbRes.rows[0];
+    return res.json({
+      success: true,
+      data: {
+        id: updated.id,
+        name: updated.name,
+        type: updated.type
+      },
+      error: null
+    });
+  } catch (err) {
+    console.error('updateAnalyticAccount error:', err.message);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: { code: 'SERVER_ERROR', message: err.message }
+    });
+  }
+}
+
+export async function deleteAnalyticAccount(req, res) {
+  try {
+    const { id } = req.params;
 
   try {
     const result = await pool.query(

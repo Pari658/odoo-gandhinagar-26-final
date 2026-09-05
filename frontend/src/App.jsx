@@ -11,6 +11,7 @@ import VendorBillsModule from './components/VendorBillsModule.jsx';
 import PaymentsModule from './components/PaymentsModule.jsx';
 import SalesOrdersModule from './components/SalesOrdersModule.jsx';
 import ReportsModule from './components/ReportsModule.jsx';
+import BudgetModule from './components/BudgetModule.jsx';
 import AdminDashboard from './components/AdminDashboard.jsx';
 import AuthPage from './components/AuthPage.jsx';
 import LandingPage from './components/LandingPage.jsx';
@@ -69,7 +70,7 @@ export default function App() {
 
   const allTabs = [
     ...(isStaff ? [
-      { id: 'dashboard', label: 'Admin Dashboard', icon: LayoutDashboard },
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { id: 'reports', label: 'Reports & Statements', icon: Scale }
     ] : []),
     { id: 'sales-orders', label: 'Sales Orders', icon: ShoppingCart },

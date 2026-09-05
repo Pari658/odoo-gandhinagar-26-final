@@ -1,6 +1,61 @@
 import { query } from '../db/index.js';
 
 /**
+ * Format a row from v_budget_progress into an API response object
+ */
+function mapBudgetRow(b) {
+  const committed = parseFloat(b.committed_amount) || 0;
+  const achieved = parseFloat(b.achieved_amount) || 0;
+  const percent = parseFloat(b.achieved_percent) || 0;
+  const remaining = parseFloat(b.amount_to_achieve) || 0;
+
+  // Determine health status
+  let health = 'on_track';
+  let healthLabel = 'Within Budget';
+  if (b.analytic_type === 'expense') {
+    if (percent > 100) {
+      health = 'over_budget';
+      healthLabel = 'Exceeded Limit';
+    } else if (percent >= 80) {
+      health = 'warning';
+      healthLabel = 'Approaching Cap';
+    }
+  } else {
+    if (percent >= 100) {
+      health = 'achieved';
+      healthLabel = 'Target Reached';
+    } else if (percent >= 50) {
+      health = 'on_track';
+      healthLabel = 'In Progress';
+    } else {
+      health = 'behind';
+      healthLabel = 'Needs Attention';
+    }
+  }
+
+  return {
+    id: b.budget_id,
+    name: b.budget_name,
+    analyticAccountId: b.analytic_account_id,
+    analyticName: b.analytic_name,
+    analyticType: b.analytic_type,
+    periodStart: b.period_start ? new Date(b.period_start).toISOString().split('T')[0] : '',
+    periodEnd: b.period_end ? new Date(b.period_end).toISOString().split('T')[0] : '',
+    committedAmount: committed,
+    achievedAmount: achieved,
+    achievedPercent: percent,
+    amountToAchieve: remaining,
+    status: b.status,
+    revisionOfId: b.revision_of_id,
+    revisionOfName: b.revision_of_name,
+    health,
+    healthLabel,
+    responsibleContactId: b.responsible_contact_id,
+    responsibleContactName: b.responsible_contact_name || 'General Management'
+  };
+}
+
+/**
  * GET /api/v1/budgets
  * Fetches all budgets with live achieved progress
  */
@@ -21,65 +76,16 @@ export async function getBudgets(req, res) {
         bp.amount_to_achieve::numeric(14,2) AS amount_to_achieve,
         bp.status,
         bp.responsible_contact_id,
-        c.name AS responsible_contact_name
+        bp.revision_of_id,
+        bp.revision_of_name,
+        bp.responsible_contact_name
       FROM v_budget_progress bp
-      LEFT JOIN contacts c ON c.id = bp.responsible_contact_id
       ORDER BY bp.period_start DESC, bp.budget_name ASC;
     `;
 
     const result = await query(sql);
     const rawItems = result?.rows || [];
-
-    const items = rawItems.map(b => {
-      const committed = parseFloat(b.committed_amount) || 0;
-      const achieved = parseFloat(b.achieved_amount) || 0;
-      const percent = parseFloat(b.achieved_percent) || 0;
-      const remaining = parseFloat(b.amount_to_achieve) || 0;
-
-      // Determine health status
-      let health = 'on_track'; // green
-      let healthLabel = 'Within Budget';
-      if (b.analytic_type === 'expense') {
-        if (percent > 100) {
-          health = 'over_budget';
-          healthLabel = 'Exceeded Limit';
-        } else if (percent >= 80) {
-          health = 'warning';
-          healthLabel = 'Approaching Cap';
-        }
-      } else {
-        // Income target
-        if (percent >= 100) {
-          health = 'achieved';
-          healthLabel = 'Target Reached';
-        } else if (percent >= 50) {
-          health = 'on_track';
-          healthLabel = 'In Progress';
-        } else {
-          health = 'behind';
-          healthLabel = 'Needs Attention';
-        }
-      }
-
-      return {
-        id: b.budget_id,
-        name: b.budget_name,
-        analyticAccountId: b.analytic_account_id,
-        analyticName: b.analytic_name,
-        analyticType: b.analytic_type,
-        periodStart: b.period_start ? new Date(b.period_start).toISOString().split('T')[0] : '',
-        periodEnd: b.period_end ? new Date(b.period_end).toISOString().split('T')[0] : '',
-        committedAmount: committed,
-        achievedAmount: achieved,
-        achievedPercent: percent,
-        amountToAchieve: remaining,
-        status: b.status,
-        health,
-        healthLabel,
-        responsibleContactId: b.responsible_contact_id,
-        responsibleContactName: b.responsible_contact_name || 'General Management'
-      };
-    });
+    const items = rawItems.map(mapBudgetRow);
 
     // Compute executive totals
     const expenseBudgets = items.filter(b => b.analyticType === 'expense');
@@ -122,6 +128,60 @@ export async function getBudgets(req, res) {
 }
 
 /**
+ * GET /api/v1/budgets/:id
+ * Fetches a single budget with live progress
+ */
+export async function getBudgetById(req, res) {
+  try {
+    const { id } = req.params;
+    const sql = `
+      SELECT 
+        bp.budget_id,
+        bp.budget_name,
+        bp.analytic_account_id,
+        bp.analytic_name,
+        bp.analytic_type,
+        bp.period_start,
+        bp.period_end,
+        bp.committed_amount::numeric(14,2) AS committed_amount,
+        bp.achieved_amount::numeric(14,2) AS achieved_amount,
+        bp.achieved_percent::numeric(5,2) AS achieved_percent,
+        bp.amount_to_achieve::numeric(14,2) AS amount_to_achieve,
+        bp.status,
+        bp.responsible_contact_id,
+        bp.revision_of_id,
+        bp.revision_of_name,
+        bp.responsible_contact_name
+      FROM v_budget_progress bp
+      WHERE bp.budget_id = $1
+      LIMIT 1;
+    `;
+
+    const result = await query(sql, [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'Budget not found' }
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: mapBudgetRow(result.rows[0]),
+      error: null
+    });
+  } catch (error) {
+    console.error('Error fetching budget by id:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: { code: 'BUDGET_ERROR', message: error.message }
+    });
+  }
+}
+
+/**
  * POST /api/v1/budgets
  * Create a new budget
  */
@@ -134,7 +194,8 @@ export async function createBudget(req, res) {
       periodEnd, 
       committedAmount, 
       responsibleContactId,
-      status = 'confirmed'
+      status = 'confirmed',
+      revisionOfId = null
     } = req.body;
 
     if (!name || !analyticAccountId || !periodStart || !periodEnd || committedAmount === undefined) {
@@ -155,9 +216,9 @@ export async function createBudget(req, res) {
 
     const insertSql = `
       INSERT INTO budgets (
-        id, name, analytic_account_id, period_start, period_end, committed_amount, responsible_contact_id, status
+        id, name, analytic_account_id, period_start, period_end, committed_amount, responsible_contact_id, status, revision_of_id
       ) VALUES (
-        gen_random_uuid(), $1, $2, $3::date, $4::date, $5::numeric, $6, $7
+        gen_random_uuid(), $1, $2, $3::date, $4::date, $5::numeric, $6, $7, $8
       ) RETURNING id;
     `;
 
@@ -168,7 +229,8 @@ export async function createBudget(req, res) {
       periodEnd,
       committedAmount,
       responsibleContactId || null,
-      status
+      status,
+      revisionOfId || null
     ]);
 
     const newId = insertRes.rows[0]?.id;
@@ -189,19 +251,94 @@ export async function createBudget(req, res) {
 }
 
 /**
- * PATCH /api/v1/budgets/:id/confirm
- * Confirm draft budget
+ * PUT /api/v1/budgets/:id
+ * Update an existing budget
  */
-export async function confirmBudget(req, res) {
+export async function updateBudget(req, res) {
   try {
     const { id } = req.params;
+    const {
+      name,
+      analyticAccountId,
+      periodStart,
+      periodEnd,
+      committedAmount,
+      responsibleContactId,
+      status
+    } = req.body;
+
+    const updateSql = `
+      UPDATE budgets
+      SET 
+        name = COALESCE($1, name),
+        analytic_account_id = COALESCE($2, analytic_account_id),
+        period_start = COALESCE($3::date, period_start),
+        period_end = COALESCE($4::date, period_end),
+        committed_amount = COALESCE($5::numeric, committed_amount),
+        responsible_contact_id = $6,
+        status = COALESCE($7, status)
+      WHERE id = $8
+      RETURNING id;
+    `;
+
+    const result = await query(updateSql, [
+      name ? name.trim() : null,
+      analyticAccountId || null,
+      periodStart || null,
+      periodEnd || null,
+      committedAmount !== undefined ? committedAmount : null,
+      responsibleContactId || null,
+      status || null,
+      id
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'Budget not found' }
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: { id, message: 'Budget updated successfully' },
+      error: null
+    });
+  } catch (error) {
+    console.error('Error updating budget:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: { code: 'BUDGET_ERROR', message: error.message }
+    });
+  }
+}
+
+/**
+ * PATCH /api/v1/budgets/:id/status
+ * Update status ('draft', 'confirmed', 'revised', 'cancelled')
+ */
+export async function updateBudgetStatus(req, res) {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!['draft', 'confirmed', 'revised', 'cancelled'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        data: null,
+        error: { code: 'VALIDATION_ERROR', message: 'Status must be draft, confirmed, revised, or cancelled' }
+      });
+    }
+
     const updateSql = `
       UPDATE budgets 
-      SET status = 'confirmed'
-      WHERE id = $1
+      SET status = $1
+      WHERE id = $2
       RETURNING id, name, status;
     `;
-    const result = await query(updateSql, [id]);
+    const result = await query(updateSql, [status, id]);
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
@@ -211,11 +348,83 @@ export async function confirmBudget(req, res) {
     }
     return res.json({
       success: true,
-      data: { budget: result.rows[0], message: 'Budget confirmed successfully' },
+      data: { budget: result.rows[0], message: `Budget status changed to ${status}` },
       error: null
     });
   } catch (error) {
-    console.error('Error confirming budget:', error);
+    console.error('Error updating budget status:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: { code: 'BUDGET_ERROR', message: error.message }
+    });
+  }
+}
+
+/**
+ * PATCH /api/v1/budgets/:id/confirm
+ */
+export async function confirmBudget(req, res) {
+  req.body.status = 'confirmed';
+  return updateBudgetStatus(req, res);
+}
+
+/**
+ * PATCH /api/v1/budgets/:id/cancel
+ */
+export async function cancelBudget(req, res) {
+  req.body.status = 'cancelled';
+  return updateBudgetStatus(req, res);
+}
+
+/**
+ * POST /api/v1/budgets/:id/revise
+ * Create a revised budget linked to the original budget
+ */
+export async function reviseBudget(req, res) {
+  try {
+    const { id } = req.params;
+
+    // Fetch original budget
+    const origRes = await query('SELECT * FROM budgets WHERE id = $1', [id]);
+    if (origRes.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'Original budget not found' }
+      });
+    }
+
+    const orig = origRes.rows[0];
+    const newName = orig.name.endsWith('(Revised)') ? orig.name : `${orig.name} (Revised)`;
+
+    const insertSql = `
+      INSERT INTO budgets (
+        id, name, analytic_account_id, period_start, period_end, committed_amount, responsible_contact_id, status, revision_of_id
+      ) VALUES (
+        gen_random_uuid(), $1, $2, $3, $4, $5, $6, 'revised', $7
+      ) RETURNING id;
+    `;
+
+    const insertRes = await query(insertSql, [
+      newName,
+      orig.analytic_account_id,
+      orig.period_start,
+      orig.period_end,
+      orig.committed_amount,
+      orig.responsible_contact_id,
+      orig.id
+    ]);
+
+    const newId = insertRes.rows[0]?.id;
+
+    return res.status(201).json({
+      success: true,
+      data: { id: newId, revisionOfId: orig.id, message: 'Budget revised successfully' },
+      error: null
+    });
+  } catch (error) {
+    console.error('Error revising budget:', error);
     return res.status(500).json({
       success: false,
       data: null,
@@ -227,10 +436,6 @@ export async function confirmBudget(req, res) {
 /**
  * GET /api/v1/budgets/check
  * Dev 2 Purchase Order Budget Warning Ping
- * Query params:
- *  - analyticAccountId: UUID
- *  - amount: number
- *  - date: YYYY-MM-DD (defaults to today)
  */
 export async function checkBudget(req, res) {
   try {
@@ -326,11 +531,9 @@ export async function checkBudget(req, res) {
 
 /**
  * POST /api/v1/budgets/seed-demo
- * Helper to seed sample budgets
  */
 export async function seedDemoBudgets(req, res) {
   try {
-    // Check if budgets already exist
     const countRes = await query('SELECT count(*) FROM budgets;');
     if (parseInt(countRes.rows[0].count, 10) > 0) {
       return res.json({
@@ -351,28 +554,11 @@ export async function seedDemoBudgets(req, res) {
     const periodStart = `${currentYear}-01-01`;
     const periodEnd = `${currentYear}-12-31`;
 
-    // Seed 2 budgets:
-    // 1. Raw Timber Procurement Cap (Expense) Committed: 50,000 (actual bills: 35,000 => 70% used)
-    // 2. Office Furniture Sales Target (Income) Committed: 100,000 (actual invoices: 85,000 => 85% achieved)
-    if (aaMap['Teak Raw Material Procurement']) {
+    if (aaMap['Project 8']) {
       await query(`
         INSERT INTO budgets (id, name, analytic_account_id, period_start, period_end, committed_amount, responsible_contact_id, status)
-        VALUES (gen_random_uuid(), 'Q1-Q4 Raw Timber Procurement Cap', $1, $2::date, $3::date, 50000.00, $4, 'confirmed');
-      `, [aaMap['Teak Raw Material Procurement'], periodStart, periodEnd, contactId]);
-    }
-
-    if (aaMap['Office Furniture Line']) {
-      await query(`
-        INSERT INTO budgets (id, name, analytic_account_id, period_start, period_end, committed_amount, responsible_contact_id, status)
-        VALUES (gen_random_uuid(), 'FY26 Office Furniture Sales Target', $1, $2::date, $3::date, 100000.00, $4, 'confirmed');
-      `, [aaMap['Office Furniture Line'], periodStart, periodEnd, contactId]);
-    }
-
-    if (aaMap['Gandhinagar Store Renovation Project']) {
-      await query(`
-        INSERT INTO budgets (id, name, analytic_account_id, period_start, period_end, committed_amount, responsible_contact_id, status)
-        VALUES (gen_random_uuid(), 'Store Renovation Expense Cap', $1, $2::date, $3::date, 20000.00, $4, 'confirmed');
-      `, [aaMap['Gandhinagar Store Renovation Project'], periodStart, periodEnd, contactId]);
+        VALUES (gen_random_uuid(), 'January 2026', $1, $2::date, $3::date, 200000.00, $4, 'confirmed');
+      `, [aaMap['Project 8'], periodStart, periodEnd, contactId]);
     }
 
     return res.json({

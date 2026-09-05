@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import pool from '../config/supabase.js';
+import { query, pool, inMemoryStore } from '../db/index.js';
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -10,7 +10,7 @@ import {
 const refreshTokens = new Set();
 
 export async function login(req, res) {
-  const loginInput = req.body.email || req.body.username;
+  const loginInput = req.body.loginId || req.body.email || req.body.username;
   const password = req.body.password;
 
   if (!loginInput || !password) {
@@ -34,8 +34,9 @@ export async function login(req, res) {
       `SELECT u.id, u.login_id, u.email, u.password_hash, u.role, u.is_active, u.created_at,
               c.id AS contact_id, c.name AS contact_name, c.type AS contact_type
        FROM users u
-       LEFT JOIN contacts c ON c.user_id = u.id OR LOWER(c.email) = LOWER(u.email)
-       WHERE LOWER(u.email) = LOWER($1) OR LOWER(u.login_id) = LOWER($1)
+       LEFT JOIN contacts c ON c.user_id = u.id OR (c.email IS NOT NULL AND u.email IS NOT NULL AND LOWER(c.email::text) = LOWER(u.email::text))
+       WHERE (u.email IS NOT NULL AND LOWER(u.email::text) = LOWER($1::text))
+          OR (u.login_id IS NOT NULL AND LOWER(u.login_id::text) = LOWER($1::text))
        LIMIT 1`,
       [loginInput.trim()]
     );
@@ -62,8 +63,13 @@ export async function login(req, res) {
     console.warn('Supabase DB user query warning:', err.message);
   }
 
-  // 2. DB fallback removed as we are completely on Postgres
-
+  // 2. Fallback to inMemoryStore if not found in DB
+  if (!user) {
+    user = inMemoryStore.users.find(u =>
+      u.email?.toLowerCase() === loginInput.trim().toLowerCase() ||
+      u.login_id?.toLowerCase() === loginInput.trim().toLowerCase()
+    );
+  }
 
   // 3. Verify password
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {

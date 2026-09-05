@@ -5,7 +5,7 @@ import { pool, query as supabaseQuery } from '../config/supabase.js';
 const inMemoryStore = {
   users: [
     {
-      id: 'u-admin-001',
+      id: '10000000-0000-0000-0000-000000000001',
       login_id: 'adminuser',
       email: 'admin@urbanfurniture.com',
       password_hash: bcrypt.hashSync('admin123', 10),
@@ -14,7 +14,7 @@ const inMemoryStore = {
       created_at: new Date().toISOString()
     },
     {
-      id: 'u-accountant-001',
+      id: '10000000-0000-0000-0000-000000000002',
       login_id: 'acctuser',
       email: 'accountant@urbanfurniture.com',
       password_hash: bcrypt.hashSync('accountant123', 10),
@@ -23,10 +23,10 @@ const inMemoryStore = {
       created_at: new Date().toISOString()
     },
     {
-      id: 'u-contact-001',
+      id: '10000000-0000-0000-0000-000000000004',
       login_id: 'nimesh12',
-      email: 'nimesh@pathak.com',
-      password_hash: bcrypt.hashSync('contact123', 10),
+      email: 'nimesh.pathak@example.com',
+      password_hash: bcrypt.hashSync('Password123!', 10),
       role: 'contact',
       is_active: true,
       created_at: new Date().toISOString()
