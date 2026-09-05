@@ -21,27 +21,18 @@ export default function PaymentModal({ document, type, onClose, onSuccess }) {
     setLoading(true);
     setError(null);
     try {
-      // 1. Create Draft Payment
       const paymentPayload = {
         direction: type,
         partnerId: type === 'outbound' ? document.vendorId : document.customerId,
+        vendorBillId: type === 'outbound' ? document.id : null,
+        customerInvoiceId: type === 'inbound' ? document.id : null,
         amount: Number(paymentData.amount),
         method: paymentData.method,
         paymentDate: paymentData.paymentDate,
         note: paymentData.note
       };
 
-      if (type === 'outbound') {
-        paymentPayload.vendorBillId = document.id;
-      } else {
-        paymentPayload.customerInvoiceId = document.id;
-      }
-
-      const createdPayment = await apiRequest('POST', '/payments', paymentPayload);
-
-      // 2. Automatically confirm the payment to post the ledger entry
-      await apiRequest('POST', `/payments/${createdPayment.id}/confirm`);
-
+      await apiRequest('POST', '/payments', paymentPayload);
       onSuccess();
     } catch (err) {
       setError(err.message);

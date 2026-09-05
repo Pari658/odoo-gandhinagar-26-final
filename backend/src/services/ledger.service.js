@@ -14,20 +14,25 @@ export async function createJournalEntry(client, data) {
     createdBy
   } = data;
 
-  // Calculate totals to ensure balance
-  let totalDebit = 0;
-  let totalCredit = 0;
+  const toMinorUnits = (value) => {
+    const text = String(value ?? 0).trim();
+    if (!/^\d+(\.\d{1,2})?$/.test(text)) {
+      throw new Error(`Invalid monetary value: ${text}`);
+    }
+    const [whole, fraction = ''] = text.split('.');
+    return (BigInt(whole) * 100n) + BigInt(fraction.padEnd(2, '0'));
+  };
+
+  let totalDebit = 0n;
+  let totalCredit = 0n;
 
   for (const line of lines) {
-    totalDebit += Number(line.debit) || 0;
-    totalCredit += Number(line.credit) || 0;
+    totalDebit += toMinorUnits(line.debit);
+    totalCredit += toMinorUnits(line.credit);
   }
 
-  // Allow small rounding differences or enforce strict?
-  // The DB constraint trigger will enforce it on post anyway,
-  // but we can reject unbalanced entries on post here if we want.
-  if (status === 'posted' && Math.abs(totalDebit - totalCredit) > 0.001) {
-    const error = new Error(`Total debit (${totalDebit.toFixed(2)}) does not equal total credit (${totalCredit.toFixed(2)})`);
+  if (status === 'posted' && totalDebit !== totalCredit) {
+    const error = new Error('Total debit does not equal total credit');
     error.code = 'UNBALANCED_ENTRY';
     throw error;
   }
@@ -36,10 +41,10 @@ export async function createJournalEntry(client, data) {
   const entryNumber = `JE/${new Date(entryDate).getFullYear()}/${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
 
   const jeResult = await client.query(
-    `INSERT INTO journal_entries (number, journal_id, entry_date, status, total, source_type, source_id, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+    `INSERT INTO journal_entries (number, journal_id, entry_date, status, source_type, source_id, created_at)
+     VALUES ($1, $2, $3, $4::je_status, $5, $6, NOW())
      RETURNING id, number, status`,
-    [entryNumber, journalId, entryDate, status, totalDebit, data.sourceType, data.sourceId]
+    [entryNumber, journalId, entryDate, status, data.sourceType, data.sourceId]
   );
   
   const je = jeResult.rows[0];

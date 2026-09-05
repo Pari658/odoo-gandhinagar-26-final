@@ -2,19 +2,25 @@ import { Router } from 'express';
 import {
   createPayment,
   confirmPayment,
-  cancelPayment
+  cancelPayment,
+  getPayment,
+  listPayments,
+  listPaymentTargets
 } from '../controllers/payments.controller.js';
 import { authenticateToken, requireRole } from '../middlewares/auth.js';
 import { validate } from '../middlewares/validate.js';
 import { paymentSchema } from '../schemas/payment.schema.js';
-import { commonSchema } from '../schemas/common.schema.js';
+import { apiLimiter } from '../middlewares/rateLimit.js';
 
 const router = Router();
 
-router.use(authenticateToken);
+router.use(apiLimiter, authenticateToken);
 
-router.post('/', requireRole('admin', 'accountant'), validate(paymentSchema.create), createPayment);
-router.post('/:id/confirm', requireRole('admin', 'accountant'), validate(commonSchema.uuidParam), confirmPayment);
-router.post('/:id/cancel', requireRole('admin', 'accountant'), validate(commonSchema.uuidParam), cancelPayment);
+router.get('/targets', listPaymentTargets);
+router.get('/', validate(paymentSchema.list), listPayments);
+router.get('/:id', validate(paymentSchema.id), getPayment);
+router.post('/', validate(paymentSchema.create), createPayment);
+router.post('/:id/confirm', requireRole('admin', 'accountant'), validate(paymentSchema.id), confirmPayment);
+router.post('/:id/cancel', requireRole('admin', 'accountant'), validate(paymentSchema.id), cancelPayment);
 
 export default router;
