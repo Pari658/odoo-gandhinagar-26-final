@@ -16,11 +16,14 @@ export const createPayment = async (req, res, next) => {
       throw new Error('customerInvoiceId is required for inbound payments');
     }
 
+    const isValidUuid = (str) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+    const recordedBy = isValidUuid(req.user?.id) ? req.user.id : '10000000-0000-0000-0000-000000000001';
+
     const payResult = await client.query(
       `INSERT INTO payments (direction, vendor_bill_id, customer_invoice_id, amount, method, payment_date, note, status, created_at, recorded_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft', NOW(), $8)
        RETURNING *`,
-      [direction, vendorBillId || null, customerInvoiceId || null, amount, method, paymentDate, note || null, req.user.id]
+      [direction, vendorBillId || null, customerInvoiceId || null, amount, method, paymentDate, note || null, recordedBy]
     );
     
     const payment = payResult.rows[0];

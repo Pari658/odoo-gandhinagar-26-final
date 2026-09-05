@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { 
-  getAnalyticAccounts, 
+  getAnalyticAccounts,
+  getAnalyticAccountById,
   createAnalyticAccount, 
+  updateAnalyticAccount,
+  deleteAnalyticAccount,
   getAnalyticBudgets 
 } from '../controllers/analyticAccounts.controller.js';
 import { authenticateToken, requireRole } from '../middlewares/auth.js';
@@ -14,7 +17,10 @@ const router = Router();
 router.use(authenticateToken);
 
 router.get('/', validate(masterDataSchema.analyticAccount.list), getAnalyticAccounts);
+router.get('/:id', validate(commonSchema.uuidParam), getAnalyticAccountById);
 router.post('/', requireRole('admin', 'accountant'), validate(masterDataSchema.analyticAccount.create), createAnalyticAccount);
+router.put('/:id', requireRole('admin', 'accountant'), validate(commonSchema.uuidParam), updateAnalyticAccount);
+router.delete('/:id', requireRole('admin', 'accountant'), validate(commonSchema.uuidParam), deleteAnalyticAccount);
 router.get('/:id/budgets', validate(commonSchema.uuidParam), getAnalyticBudgets);
 
 export default router;

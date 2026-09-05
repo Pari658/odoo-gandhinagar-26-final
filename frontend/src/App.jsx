@@ -11,6 +11,7 @@ import VendorBillsModule from './components/VendorBillsModule.jsx';
 import SalesOrdersModule from './components/SalesOrdersModule.jsx';
 import ReportsModule from './components/ReportsModule.jsx';
 import AdminDashboard from './components/AdminDashboard.jsx';
+import CustomerBillsModule from './components/CustomerBillsModule.jsx';
 import AuthPage from './components/AuthPage.jsx';
 import LandingPage from './components/LandingPage.jsx';
 import { useAuth } from './context/AuthContext.jsx';
@@ -48,10 +49,14 @@ export default function App() {
 
   const isStaff = user?.role === 'admin' || user?.role === 'accountant';
 
-  // If role is contact and activeTab is reports or dashboard, fallback to contacts
+  // If role is contact/customer, force activeTab to 'my-bills'
   useEffect(() => {
-    if (user && !isStaff && (activeTab === 'reports' || activeTab === 'dashboard')) {
-      setActiveTab('contacts');
+    if (user && !isStaff) {
+      if (activeTab !== 'my-bills') {
+        setActiveTab('my-bills');
+      }
+    } else if (user && isStaff && activeTab === 'my-bills') {
+      setActiveTab('dashboard');
     }
   }, [user, isStaff, activeTab]);
 
@@ -66,20 +71,20 @@ export default function App() {
     return <AuthPage onBack={() => setShowLanding(true)} />;
   }
 
-  const allTabs = [
-    ...(isStaff ? [
-      { id: 'dashboard', label: 'Admin Dashboard', icon: LayoutDashboard },
-      { id: 'reports', label: 'Reports & Statements', icon: Scale }
-    ] : []),
+  const allTabs = isStaff ? [
+    { id: 'dashboard', label: 'Admin Dashboard', icon: LayoutDashboard },
     { id: 'sales-orders', label: 'Sales Orders', icon: ShoppingCart },
+    { id: 'purchase-orders', label: 'Purchase Orders', icon: ShoppingCart },
+    { id: 'vendor-bills', label: 'Vendor Bills', icon: FileText },
     { id: 'contacts', label: 'Contact Master', icon: Users },
     { id: 'products', label: 'Product Master', icon: Package },
     { id: 'accounts', label: 'Chart of Accounts', icon: BookOpen },
     { id: 'journals', label: 'Journals Master', icon: BookMarked },
     { id: 'tax-rates', label: 'Tax Rates', icon: Percent },
     { id: 'analytic-accounts', label: 'Analytic Accounts', icon: PieChart },
-    { id: 'purchase-orders', label: 'Purchase Orders', icon: ShoppingCart },
-    { id: 'vendor-bills', label: 'Vendor Bills', icon: FileText }
+    { id: 'reports', label: 'Reports & Statements', icon: Scale }
+  ] : [
+    { id: 'my-bills', label: 'My Bills & Invoices', icon: FileText }
   ];
 
   return (
@@ -96,10 +101,10 @@ export default function App() {
             </div>
             <div>
               <h2 className="font-heading font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6]">
-                Dev 1 & Dev 2 Architect Engines Active
+                {isStaff ? 'Dev 1 & Dev 2 Architect Engines Active' : 'Customer Self-Service Portal Active'}
               </h2>
               <p className="text-xs text-[#6B5E55] dark:text-[#A89B91]">
-                Master Data Management, Payable Ops (Purchases & Unified Payments), 2-Way JWT Auth & Supabase PostgreSQL Database Integration
+                {isStaff ? 'Master Data Management, Payable Ops, 2-Way JWT Auth & Supabase PostgreSQL Database Integration' : 'View your customer invoices, payment statuses, and balance history'}
               </p>
             </div>
           </div>
@@ -136,6 +141,7 @@ export default function App() {
         {/* Active Module Panel */}
         <div className="pt-2">
           {activeTab === 'dashboard' && <AdminDashboard onNavigate={setActiveTab} />}
+          {activeTab === 'my-bills' && <CustomerBillsModule />}
           {activeTab === 'reports' && <ReportsModule />}
           {activeTab === 'sales-orders' && <SalesOrdersModule />}
           {activeTab === 'contacts' && <ContactsModule />}

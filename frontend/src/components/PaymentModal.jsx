@@ -2,15 +2,20 @@ import React, { useState } from 'react';
 import { apiRequest } from '../api/client.js';
 import { DollarSign, CheckCircle, AlertCircle } from 'lucide-react';
 
-export default function PaymentModal({ document, type, onClose, onSuccess }) {
-  // document should be either a vendorBill or a customerInvoice object
-  // type should be 'outbound' for bills, 'inbound' for invoices
+export default function PaymentModal({ document, type = 'outbound', onClose, onSuccess }) {
+  if (!document) return null;
+
+  const initialAmountDue = Number(
+    document.amountDue !== undefined
+      ? document.amountDue
+      : (Number(document.totalAmount || 0) - Number(document.amountPaid || 0))
+  );
 
   const [paymentData, setPaymentData] = useState({
-    amount: type === 'outbound' ? document.amountDue : document.amountDue,
+    amount: initialAmountDue > 0 ? initialAmountDue.toFixed(2) : '0.00',
     method: 'bank',
     paymentDate: new Date().toISOString().split('T')[0],
-    note: `Payment for ${type === 'outbound' ? document.billNumber : document.invoiceNumber}`
+    note: `Payment for ${type === 'outbound' ? (document.billNumber || document.number || 'Bill') : (document.invoiceNumber || document.number || 'Invoice')}`
   });
 
   const [loading, setLoading] = useState(false);
@@ -39,12 +44,14 @@ export default function PaymentModal({ document, type, onClose, onSuccess }) {
 
       const createdPayment = await apiRequest('POST', '/payments', paymentPayload);
 
-      // 2. Automatically confirm the payment to post the ledger entry
-      await apiRequest('POST', `/payments/${createdPayment.id}/confirm`);
+      // 2. Automatically confirm the payment to post ledger entries & update bill status to paid / partially_paid
+      if (createdPayment && createdPayment.id) {
+        await apiRequest('POST', `/payments/${createdPayment.id}/confirm`);
+      }
 
-      onSuccess();
+      if (onSuccess) onSuccess();
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Failed to process payment');
     } finally {
       setLoading(false);
     }
@@ -62,13 +69,13 @@ export default function PaymentModal({ document, type, onClose, onSuccess }) {
           <div className="flex justify-between mb-1">
             <span className="text-[#6B5E55]">{type === 'outbound' ? 'Vendor' : 'Customer'}</span>
             <span className="font-semibold text-[#2C221E] dark:text-[#F5EFE6]">
-              {type === 'outbound' ? document.vendorName : document.customerName}
+              {type === 'outbound' ? (document.vendorName || 'Vendor') : (document.customerName || 'Customer')}
             </span>
           </div>
           <div className="flex justify-between">
             <span className="text-[#6B5E55]">Amount Due</span>
             <span className="font-mono font-bold text-[#B91C1C] dark:text-[#F87171]">
-              ${Number(type === 'outbound' ? document.amountDue : document.amountDue).toFixed(2)}
+              ₹{initialAmountDue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </span>
           </div>
         </div>
@@ -84,15 +91,15 @@ export default function PaymentModal({ document, type, onClose, onSuccess }) {
           <div>
             <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Payment Amount *</label>
             <div className="relative">
-              <DollarSign className="w-4 h-4 absolute left-3 top-2.5 text-[#9E9085]" />
+              <span className="absolute left-3 top-2.5 text-[#9E9085] font-mono">₹</span>
               <input
                 type="number"
                 step="0.01"
                 required
-                max={Number(type === 'outbound' ? document.amountDue : document.amountDue)}
+                max={initialAmountDue}
                 value={paymentData.amount}
                 onChange={e => setPaymentData({ ...paymentData, amount: e.target.value })}
-                className="w-full pl-9 pr-4 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] font-mono text-sm"
+                className="w-full pl-8 pr-4 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] font-mono text-sm text-[#2C221E] dark:text-[#F5EFE6]"
               />
             </div>
           </div>
@@ -103,7 +110,7 @@ export default function PaymentModal({ document, type, onClose, onSuccess }) {
               <select
                 value={paymentData.method}
                 onChange={e => setPaymentData({ ...paymentData, method: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D]"
+                className="w-full px-3 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6]"
               >
                 <option value="bank">Bank / Wire Transfer</option>
                 <option value="cash">Cash</option>
@@ -116,7 +123,7 @@ export default function PaymentModal({ document, type, onClose, onSuccess }) {
                 required
                 value={paymentData.paymentDate}
                 onChange={e => setPaymentData({ ...paymentData, paymentDate: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D]"
+                className="w-full px-3 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6]"
               />
             </div>
           </div>
@@ -127,7 +134,7 @@ export default function PaymentModal({ document, type, onClose, onSuccess }) {
               type="text"
               value={paymentData.note}
               onChange={e => setPaymentData({ ...paymentData, note: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D]"
+              className="w-full px-3 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6]"
             />
           </div>
 
@@ -145,7 +152,7 @@ export default function PaymentModal({ document, type, onClose, onSuccess }) {
               disabled={loading}
               className="bg-[#15803D] hover:bg-[#166534] text-white px-4 py-2 rounded-lg font-semibold cursor-pointer shadow-sm flex items-center gap-2"
             >
-              {loading ? 'Processing...' : <><CheckCircle className="w-4 h-4" /> Validate Payment</>}
+              {loading ? 'Processing...' : <><CheckCircle className="w-4 h-4" /> Validate & Post Payment</>}
             </button>
           </div>
         </form>
