@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import { FileText, Plus, Search, CheckCircle, XCircle, DollarSign, Check, AlertCircle, ArrowLeft, Trash2, Calendar, User, ShoppingBag, Layers, AlertTriangle } from 'lucide-react';
+import { FileText, Plus, Search, CheckCircle, XCircle, DollarSign, Check, AlertCircle, ArrowLeft, Trash2, Calendar, User, ShoppingBag, Layers, AlertTriangle, LayoutGrid, List } from 'lucide-react';
 import PaymentModal from './PaymentModal.jsx';
 
 export default function VendorBillsModule() {
@@ -15,6 +15,7 @@ export default function VendorBillsModule() {
   const [search, setSearch] = useState('');
   
   const [view, setView] = useState('list'); // 'list' | 'detail'
+  const [displayMode, setDisplayMode] = useState('kanban'); // 'kanban' | 'table'
   const [selectedBillId, setSelectedBillId] = useState(null);
   const [billDetail, setBillDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -542,7 +543,7 @@ export default function VendorBillsModule() {
       )}
 
       {/* Filter and Search Bar */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div className="relative w-full sm:max-w-md">
           <Search className="w-4 h-4 absolute left-3 top-2.5 text-[#9E9085]" />
           <input
@@ -553,64 +554,167 @@ export default function VendorBillsModule() {
             className="w-full pl-9 pr-4 py-2 text-xs rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-white dark:bg-[#1C1613] text-[#2C221E] dark:text-[#F5EFE6] focus:outline-none focus:ring-2 focus:ring-[#B45309]"
           />
         </div>
+
+        {/* View Toggles */}
+        <div className="flex items-center bg-[#FAF6EE] dark:bg-[#29211D] rounded-lg border border-[#E6DFD5] dark:border-[#382D27] p-1 shrink-0">
+          <button
+            onClick={() => setDisplayMode('table')}
+            className={`p-1.5 rounded-md transition-colors cursor-pointer ${displayMode === 'table' ? 'bg-white dark:bg-[#1C1613] shadow-sm text-[#B45309]' : 'text-[#6B5E55] hover:text-[#2C221E] dark:hover:text-[#F5EFE6]'}`}
+            title="List View"
+          >
+            <List className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setDisplayMode('kanban')}
+            className={`p-1.5 rounded-md transition-colors cursor-pointer ${displayMode === 'kanban' ? 'bg-white dark:bg-[#1C1613] shadow-sm text-[#B45309]' : 'text-[#6B5E55] hover:text-[#2C221E] dark:hover:text-[#F5EFE6]'}`}
+            title="Kanban View"
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
-      {/* Bills Grid */}
+      {/* Bills Display */}
       {loading ? (
         <div className="text-center py-12 text-xs text-[#6B5E55]">Loading Vendor Bills...</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredBills.map(bill => (
-            <div
-              key={bill.id}
-              onClick={() => openDetail(bill.id)}
-              className="p-4 rounded-xl bg-white dark:bg-[#1C1613] border border-[#E6DFD5] dark:border-[#382D27] shadow-sm hover:shadow-md hover:border-[#B45309]/50 transition-all cursor-pointer space-y-4 group"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#FAF6EE] dark:bg-[#29211D] border border-[#E6DFD5] dark:border-[#382D27] flex items-center justify-center text-[#B45309] group-hover:bg-[#B45309] group-hover:text-white transition-all">
-                    <FileText className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-heading font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6] group-hover:text-[#B45309] transition-colors">
-                      {bill.number || bill.billNumber}
-                    </h3>
-                    <p className="text-xs text-[#6B5E55] dark:text-[#A89B91]">
+      ) : filteredBills.length === 0 ? (
+        <div className="text-center py-12 text-xs text-[#6B5E55]">No vendor bills found.</div>
+      ) : displayMode === 'table' ? (
+        <div className="bg-white dark:bg-[#1C1613] rounded-2xl border border-[#E6DFD5] dark:border-[#382D27] overflow-hidden shadow-sm flex flex-col flex-1">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead className="bg-[#FAF6EE] dark:bg-[#29211D] text-[#6B5E55] dark:text-[#A89B91]">
+                <tr>
+                  <th className="px-6 py-4 font-semibold">Bill Number</th>
+                  <th className="px-6 py-4 font-semibold">Vendor</th>
+                  <th className="px-6 py-4 font-semibold">Due Date</th>
+                  <th className="px-6 py-4 font-semibold text-right">Total Amount</th>
+                  <th className="px-6 py-4 font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E6DFD5] dark:divide-[#382D27]">
+                {filteredBills.map((bill) => (
+                  <tr 
+                    key={bill.id} 
+                    onClick={() => openDetail(bill.id)}
+                    className="group hover:bg-[#FAF6EE]/50 dark:hover:bg-[#29211D]/50 transition-colors cursor-pointer"
+                  >
+                    <td className="px-6 py-4">
+                      <span className="font-bold text-[#2C221E] dark:text-[#F5EFE6]">{bill.number || bill.billNumber}</span>
+                    </td>
+                    <td className="px-6 py-4 text-[#6B5E55] dark:text-[#A89B91]">
                       {bill.vendorName}
-                    </p>
+                    </td>
+                    <td className="px-6 py-4 text-[#6B5E55] dark:text-[#A89B91]">
+                      {new Date(bill.dueDate).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 text-right font-mono font-bold text-[#2C221E] dark:text-[#F5EFE6]">
+                      ₹{Number(bill.totalAmount).toLocaleString('en-IN')}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border uppercase ${
+                        bill.status === 'paid'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                          : bill.status === 'partially_paid'
+                          ? 'bg-blue-50 text-blue-800 border-blue-200'
+                          : bill.status === 'unpaid'
+                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                          : 'bg-slate-100 text-slate-700 border-slate-200'
+                      }`}>
+                        {bill.status?.replace('_', ' ')}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-4 overflow-x-auto pb-4 flex-1 items-start min-h-[500px]">
+          {/* Unpaid Column */}
+          <div className="w-80 shrink-0 bg-[#FAF6EE]/50 dark:bg-[#1C1613]/50 rounded-2xl border border-[#E6DFD5] dark:border-[#382D27] flex flex-col h-full max-h-full">
+            <div className="p-4 border-b border-[#E6DFD5]/50 dark:border-[#382D27] flex items-center justify-between sticky top-0 bg-[#FAF6EE]/90 dark:bg-[#1C1613]/90 backdrop-blur-sm rounded-t-2xl z-10">
+              <h3 className="font-heading font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6] flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600" />
+                Unpaid
+              </h3>
+              <span className="text-[10px] font-bold bg-[#E6DFD5] dark:bg-[#382D27] text-[#6B5E55] px-2 py-0.5 rounded-full">
+                {filteredBills.filter(b => b.status === 'unpaid' || b.status === 'draft').length}
+              </span>
+            </div>
+            <div className="p-3 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
+              {filteredBills.filter(b => b.status === 'unpaid' || b.status === 'draft').map(bill => (
+                <div key={bill.id} onClick={() => openDetail(bill.id)} className="bg-white dark:bg-[#29211D] p-4 rounded-xl border border-[#E6DFD5] dark:border-[#382D27] shadow-sm hover:shadow-md hover:border-amber-300 transition-all cursor-pointer group">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6] group-hover:text-amber-600 transition-colors">{bill.number || bill.billNumber}</span>
+                    <span className="font-mono font-bold text-[#2C221E] dark:text-[#F5EFE6] text-xs">₹{Number(bill.totalAmount).toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="text-xs text-[#6B5E55] dark:text-[#A89B91] mb-3 line-clamp-1">{bill.vendorName}</div>
+                  <div className="flex items-center justify-between border-t border-[#E6DFD5]/60 dark:border-[#382D27] pt-2">
+                    <span className="text-[10px] font-mono text-amber-600 font-bold">Due: {new Date(bill.dueDate).toLocaleDateString()}</span>
+                    <span className="text-[10px] font-bold text-amber-600 uppercase">Unpaid</span>
                   </div>
                 </div>
-
-                <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border uppercase ${
-                  bill.status === 'paid'
-                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                    : bill.status === 'partially_paid'
-                    ? 'bg-blue-50 text-blue-800 border-blue-200'
-                    : bill.status === 'unpaid'
-                    ? 'bg-amber-50 text-amber-800 border-amber-200'
-                    : 'bg-slate-100 text-slate-700 border-slate-200'
-                }`}>
-                  {bill.status?.replace('_', ' ')}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-xs border-t border-b border-[#E6DFD5]/40 dark:border-[#382D27] py-2">
-                <div>
-                  <span className="text-[#6B5E55] block text-[10px]">Total Amount</span>
-                  <span className="font-bold text-[#2C221E] dark:text-[#F5EFE6]">₹{Number(bill.totalAmount).toLocaleString('en-IN')}</span>
-                </div>
-                <div>
-                  <span className="text-[#6B5E55] block text-[10px]">Due Date</span>
-                  <span className="font-medium text-[#6B5E55]">{new Date(bill.dueDate).toLocaleDateString()}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-xs pt-1">
-                <span className="text-[#6B5E55]">Balance: <strong className="text-[#B45309]">₹{Number(bill.amountDue).toLocaleString('en-IN')}</strong></span>
-                <span className="font-bold text-[#B45309]">View Details →</span>
-              </div>
+              ))}
             </div>
-          ))}
+          </div>
+
+          {/* Partially Paid Column */}
+          <div className="w-80 shrink-0 bg-[#FAF6EE]/50 dark:bg-[#1C1613]/50 rounded-2xl border border-[#E6DFD5] dark:border-[#382D27] flex flex-col h-full max-h-full">
+            <div className="p-4 border-b border-[#E6DFD5]/50 dark:border-[#382D27] flex items-center justify-between sticky top-0 bg-[#FAF6EE]/90 dark:bg-[#1C1613]/90 backdrop-blur-sm rounded-t-2xl z-10">
+              <h3 className="font-heading font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6] flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-blue-600" />
+                Partially Paid
+              </h3>
+              <span className="text-[10px] font-bold bg-[#E6DFD5] dark:bg-[#382D27] text-[#6B5E55] px-2 py-0.5 rounded-full">
+                {filteredBills.filter(b => b.status === 'partially_paid').length}
+              </span>
+            </div>
+            <div className="p-3 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
+              {filteredBills.filter(b => b.status === 'partially_paid').map(bill => (
+                <div key={bill.id} onClick={() => openDetail(bill.id)} className="bg-white dark:bg-[#29211D] p-4 rounded-xl border border-blue-200 dark:border-blue-900/50 shadow-sm hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6] group-hover:text-blue-600 transition-colors">{bill.number || bill.billNumber}</span>
+                    <span className="font-mono font-bold text-[#2C221E] dark:text-[#F5EFE6] text-xs">₹{Number(bill.totalAmount).toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="text-xs text-[#6B5E55] dark:text-[#A89B91] mb-3 line-clamp-1">{bill.vendorName}</div>
+                  <div className="flex items-center justify-between border-t border-[#E6DFD5]/60 dark:border-[#382D27] pt-2">
+                    <span className="text-[10px] font-mono text-[#A89B91]">Due: {new Date(bill.dueDate).toLocaleDateString()}</span>
+                    <span className="text-[10px] font-bold text-blue-600 uppercase">Bal: ₹{Number(bill.amountDue).toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Paid Column */}
+          <div className="w-80 shrink-0 bg-[#FAF6EE]/50 dark:bg-[#1C1613]/50 rounded-2xl border border-[#E6DFD5] dark:border-[#382D27] flex flex-col h-full max-h-full">
+            <div className="p-4 border-b border-[#E6DFD5]/50 dark:border-[#382D27] flex items-center justify-between sticky top-0 bg-[#FAF6EE]/90 dark:bg-[#1C1613]/90 backdrop-blur-sm rounded-t-2xl z-10">
+              <h3 className="font-heading font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6] flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-emerald-600" />
+                Paid
+              </h3>
+              <span className="text-[10px] font-bold bg-[#E6DFD5] dark:bg-[#382D27] text-[#6B5E55] px-2 py-0.5 rounded-full">
+                {filteredBills.filter(b => b.status === 'paid').length}
+              </span>
+            </div>
+            <div className="p-3 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
+              {filteredBills.filter(b => b.status === 'paid').map(bill => (
+                <div key={bill.id} onClick={() => openDetail(bill.id)} className="bg-white dark:bg-[#29211D] p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/50 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all cursor-pointer group">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6] group-hover:text-emerald-600 transition-colors">{bill.number || bill.billNumber}</span>
+                    <span className="font-mono font-bold text-[#2C221E] dark:text-[#F5EFE6] text-xs">₹{Number(bill.totalAmount).toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="text-xs text-[#6B5E55] dark:text-[#A89B91] mb-3 line-clamp-1">{bill.vendorName}</div>
+                  <div className="flex items-center justify-between border-t border-[#E6DFD5]/60 dark:border-[#382D27] pt-2">
+                    <span className="text-[10px] font-mono text-[#A89B91]">Paid</span>
+                    <span className="text-[10px] font-bold text-emerald-600 uppercase flex items-center gap-1"><Check className="w-3 h-3"/> Paid</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

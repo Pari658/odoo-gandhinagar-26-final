@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import { Users, Plus, Search, Filter, Mail, Phone, MapPin, CheckCircle, ShieldAlert, Image as ImageIcon } from 'lucide-react';
+import { Users, Plus, Search, Filter, Mail, Phone, MapPin, CheckCircle, ShieldAlert, Image as ImageIcon, LayoutGrid, List } from 'lucide-react';
 import ContactForm from './ContactForm.jsx';
 import ContactDetail from './ContactDetail.jsx';
 
 export default function ContactsModule() {
   const { user } = useAuth();
   const [view, setView] = useState('list'); // 'list' | 'detail'
+  const [displayMode, setDisplayMode] = useState('kanban'); // 'kanban' (grid) | 'table'
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -155,11 +156,88 @@ export default function ContactsModule() {
               <option value="vendor">Vendors Only</option>
               <option value="both">Both (Customer & Vendor)</option>
             </select>
+
+            {/* View Toggles */}
+            <div className="flex items-center bg-[#FAF6EE] dark:bg-[#29211D] rounded-lg border border-[#E6DFD5] dark:border-[#382D27] p-1">
+              <button
+                onClick={() => setDisplayMode('table')}
+                className={`p-1.5 rounded-md transition-colors cursor-pointer ${displayMode === 'table' ? 'bg-white dark:bg-[#1C1613] shadow-sm text-[#B45309]' : 'text-[#6B5E55] hover:text-[#2C221E] dark:hover:text-[#F5EFE6]'}`}
+                title="List View"
+              >
+                <List className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setDisplayMode('kanban')}
+                className={`p-1.5 rounded-md transition-colors cursor-pointer ${displayMode === 'kanban' ? 'bg-white dark:bg-[#1C1613] shadow-sm text-[#B45309]' : 'text-[#6B5E55] hover:text-[#2C221E] dark:hover:text-[#F5EFE6]'}`}
+                title="Kanban/Grid View"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
-          {/* Contacts Grid */}
+          {/* Contacts Display */}
           {loading ? (
             <div className="text-center py-12 text-xs text-[#6B5E55]">Loading Contacts...</div>
+          ) : contacts.length === 0 ? (
+            <div className="text-center py-12 text-xs text-[#6B5E55]">No contacts found.</div>
+          ) : displayMode === 'table' ? (
+            <div className="bg-white dark:bg-[#1C1613] rounded-xl border border-[#E6DFD5] dark:border-[#382D27] overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs whitespace-nowrap">
+                  <thead className="bg-[#FAF6EE] dark:bg-[#29211D] text-[#6B5E55] dark:text-[#A89B91]">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Name</th>
+                      <th className="px-4 py-3 font-semibold">Type</th>
+                      <th className="px-4 py-3 font-semibold">Email</th>
+                      <th className="px-4 py-3 font-semibold">Phone</th>
+                      <th className="px-4 py-3 font-semibold">Location</th>
+                      <th className="px-4 py-3 font-semibold">Portal</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E6DFD5] dark:divide-[#382D27]">
+                    {contacts.map(c => (
+                      <tr 
+                        key={c.id}
+                        onClick={() => {
+                          setSelectedId(c.id);
+                          setView('detail');
+                        }}
+                        className="hover:bg-[#FAF6EE]/50 dark:hover:bg-[#29211D]/40 cursor-pointer"
+                      >
+                        <td className="px-4 py-3 font-bold text-[#2C221E] dark:text-[#F5EFE6]">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-[#FAF6EE] dark:bg-[#29211D] flex items-center justify-center text-[9px] font-bold text-[#B45309]">
+                              {c.name.slice(0, 2).toUpperCase()}
+                            </div>
+                            {c.name}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border uppercase ${
+                            c.type === 'vendor' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+                            c.type === 'customer' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+                            'bg-purple-50 text-purple-800 border-purple-200'
+                          }`}>
+                            {c.type}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-[#6B5E55] dark:text-[#A89B91]">{c.email || '-'}</td>
+                        <td className="px-4 py-3 text-[#6B5E55] dark:text-[#A89B91]">{c.mobile || '-'}</td>
+                        <td className="px-4 py-3 text-[#6B5E55] dark:text-[#A89B91]">{c.city ? `${c.city}, ${c.state || ''}` : '-'}</td>
+                        <td className="px-4 py-3">
+                          {c.userId ? (
+                            <CheckCircle className="w-3.5 h-3.5 text-emerald-600" title="Portal Login Provisioned" />
+                          ) : (
+                            <span className="text-[10px] text-[#A89B91]">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {contacts.map(c => (
