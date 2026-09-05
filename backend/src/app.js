@@ -12,6 +12,7 @@ import analyticAccountsRoutes from './routes/analyticAccounts.routes.js';
 import purchaseOrdersRoutes from './routes/purchaseOrders.routes.js';
 import vendorBillsRoutes from './routes/vendorBills.routes.js';
 import paymentsRoutes from './routes/payments.routes.js';
+import salesOrdersRoutes from './routes/salesOrders.routes.js';
 
 const app = express();
 
@@ -49,6 +50,8 @@ app.use(['/api/v1/analytic-accounts', '/api/analytic-accounts', '/analytic-accou
 app.use(['/api/v1/purchase-orders', '/api/purchase-orders', '/purchase-orders'], purchaseOrdersRoutes);
 app.use(['/api/v1/vendor-bills', '/api/vendor-bills', '/vendor-bills'], vendorBillsRoutes);
 app.use(['/api/v1/payments', '/api/payments', '/payments'], paymentsRoutes);
+app.use(['/api/v1/sales-orders', '/api/sales-orders', '/sales-orders'], salesOrdersRoutes);
+app.use(['/api/v1/sales-orders', '/api/sales-orders', '/sales-orders'], salesOrdersRoutes);
 
 // ---------------------------------------------------------------------------
 

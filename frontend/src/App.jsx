@@ -8,13 +8,16 @@ import TaxRatesModule from './components/TaxRatesModule.jsx';
 import AnalyticAccountsModule from './components/AnalyticAccountsModule.jsx';
 import PurchaseOrdersModule from './components/PurchaseOrdersModule.jsx';
 import VendorBillsModule from './components/VendorBillsModule.jsx';
+import SalesOrdersModule from './components/SalesOrdersModule.jsx';
 import AuthPage from './components/AuthPage.jsx';
+import LandingPage from './components/LandingPage.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { Users, Package, BookOpen, BookMarked, Percent, PieChart, ShieldCheck, ShoppingCart, FileText } from 'lucide-react';
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('uf_theme') || 'light');
   const [activeTab, setActiveTab] = useState('contacts');
+  const [showLanding, setShowLanding] = useState(true);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -34,7 +37,10 @@ export default function App() {
   };
 
   if (!user) {
-    return <AuthPage />;
+    if (showLanding) {
+      return <LandingPage onEnter={() => setShowLanding(false)} />;
+    }
+    return <AuthPage onBack={() => setShowLanding(true)} />;
   }
 
   const tabs = [
@@ -46,6 +52,7 @@ export default function App() {
     { id: 'analytic-accounts', label: 'Analytic Accounts', icon: PieChart },
     { id: 'purchase-orders', label: 'Purchase Orders', icon: ShoppingCart },
     { id: 'vendor-bills', label: 'Vendor Bills', icon: FileText },
+    { id: 'sales-orders', label: 'Sales Orders', icon: ShoppingCart },
   ];
 
   return (
@@ -109,6 +116,7 @@ export default function App() {
           {activeTab === 'analytic-accounts' && <AnalyticAccountsModule />}
           {activeTab === 'purchase-orders' && <PurchaseOrdersModule />}
           {activeTab === 'vendor-bills' && <VendorBillsModule />}
+          {activeTab === 'sales-orders' && <SalesOrdersModule />}
         </div>
       </main>
     </div>
