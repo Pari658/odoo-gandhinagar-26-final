@@ -1,9 +1,5 @@
 import jwt from 'jsonwebtoken';
 
-/**
- * Lazily read JWT secrets so dotenv.config() in server.js has time to run
- * before these values are resolved. Fail-fast if secrets are missing.
- */
 function getAccessSecret() {
   const secret = process.env.JWT_ACCESS_SECRET;
   if (!secret) throw new Error('JWT_ACCESS_SECRET env variable is not set');
@@ -28,7 +24,7 @@ export function generateAccessToken(user) {
       contactId: user.contact_id || user.contactId || null
     },
     getAccessSecret(),
-    { expiresIn: '15m' }
+    { expiresIn: '7d' } // Extended for hackathon demo to avoid session drops
   );
 }
 
@@ -71,7 +67,7 @@ export function authenticateToken(req, res, next) {
   if (!token) {
     return res.status(401).json({
       success: false,
-      data: null,
+      // data: null,
       error: {
         code: 'UNAUTHORIZED',
         message: 'Access token missing'
@@ -83,7 +79,7 @@ export function authenticateToken(req, res, next) {
     if (err) {
       return res.status(401).json({
         success: false,
-        data: null,
+        // data: null,
         error: {
           code: 'UNAUTHORIZED',
           message: 'Invalid or expired access token'
@@ -104,7 +100,7 @@ export function requireRole(...allowedRoles) {
     if (!req.user || !allowedRoles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        data: null,
+        // data: null,
         error: {
           code: 'FORBIDDEN',
           message: `Access denied. Required role: ${allowedRoles.join(', ')}`

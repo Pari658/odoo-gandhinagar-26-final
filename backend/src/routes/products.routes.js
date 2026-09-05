@@ -6,14 +6,16 @@ import {
   updateProduct 
 } from '../controllers/products.controller.js';
 import { authenticateToken, requireRole } from '../middlewares/auth.js';
+import { validate } from '../middlewares/validate.js';
+import { productSchema } from '../schemas/product.schema.js';
 
 const router = Router();
 
 router.use(authenticateToken);
 
-router.get('/', getProducts);
+router.get('/', validate(productSchema.list), getProducts);
 router.get('/categories', getProductCategories);
-router.post('/', requireRole('admin', 'accountant'), createProduct);
-router.put('/:id', requireRole('admin', 'accountant'), updateProduct);
+router.post('/', requireRole('admin', 'accountant'), validate(productSchema.create), createProduct);
+router.put('/:id', requireRole('admin', 'accountant'), validate(productSchema.update), updateProduct);
 
 export default router;

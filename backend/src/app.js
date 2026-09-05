@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { apiLimiter } from './middlewares/rateLimit.js';
 
 import authRoutes from './routes/auth.routes.js';
 import contactsRoutes from './routes/contacts.routes.js';
@@ -8,6 +9,7 @@ import accountsRoutes from './routes/accounts.routes.js';
 import journalsRoutes from './routes/journals.routes.js';
 import taxRatesRoutes from './routes/taxRates.routes.js';
 import analyticAccountsRoutes from './routes/analyticAccounts.routes.js';
+import salesOrdersRoutes from './routes/salesOrders.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
 import budgetsRoutes from './routes/budgets.routes.js';
 
@@ -18,6 +20,7 @@ const app = express();
 // ---------------------------------------------------------------------------
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+app.use('/api', apiLimiter);
 
 // ---------------------------------------------------------------------------
 // Health Check
@@ -43,6 +46,7 @@ app.use(['/api/v1/accounts', '/api/accounts', '/accounts'], accountsRoutes);
 app.use(['/api/v1/journals', '/api/journals', '/journals'], journalsRoutes);
 app.use(['/api/v1/tax-rates', '/api/tax-rates', '/tax-rates'], taxRatesRoutes);
 app.use(['/api/v1/analytic-accounts', '/api/analytic-accounts', '/analytic-accounts'], analyticAccountsRoutes);
+app.use(['/api/v1/sales-orders', '/api/sales-orders', '/sales-orders'], salesOrdersRoutes);
 app.use(['/api/v1/reports', '/api/reports', '/reports'], reportsRoutes);
 app.use(['/api/v1/budgets', '/api/budgets', '/budgets'], budgetsRoutes);
 

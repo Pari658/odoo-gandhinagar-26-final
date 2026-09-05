@@ -5,13 +5,16 @@ import {
   getAnalyticBudgets 
 } from '../controllers/analyticAccounts.controller.js';
 import { authenticateToken, requireRole } from '../middlewares/auth.js';
+import { validate } from '../middlewares/validate.js';
+import { masterDataSchema } from '../schemas/masterData.schema.js';
+import { commonSchema } from '../schemas/common.schema.js';
 
 const router = Router();
 
 router.use(authenticateToken);
 
-router.get('/', getAnalyticAccounts);
-router.post('/', requireRole('admin', 'accountant'), createAnalyticAccount);
-router.get('/:id/budgets', getAnalyticBudgets);
+router.get('/', validate(masterDataSchema.analyticAccount.list), getAnalyticAccounts);
+router.post('/', requireRole('admin', 'accountant'), validate(masterDataSchema.analyticAccount.create), createAnalyticAccount);
+router.get('/:id/budgets', validate(commonSchema.uuidParam), getAnalyticBudgets);
 
 export default router;

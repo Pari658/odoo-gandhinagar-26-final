@@ -6,15 +6,29 @@ import AccountsModule from './components/AccountsModule.jsx';
 import JournalsModule from './components/JournalsModule.jsx';
 import TaxRatesModule from './components/TaxRatesModule.jsx';
 import AnalyticAccountsModule from './components/AnalyticAccountsModule.jsx';
+import SalesOrdersModule from './components/SalesOrdersModule.jsx';
 import ReportsModule from './components/ReportsModule.jsx';
 import AdminDashboard from './components/AdminDashboard.jsx';
 import AuthPage from './components/AuthPage.jsx';
+import LandingPage from './components/LandingPage.jsx';
 import { useAuth } from './context/AuthContext.jsx';
-import { Users, Package, BookOpen, BookMarked, Percent, PieChart, ShieldCheck, Scale, LayoutDashboard } from 'lucide-react';
+import { 
+  Users, 
+  Package, 
+  BookOpen, 
+  BookMarked, 
+  Percent, 
+  PieChart, 
+  ShieldCheck, 
+  Scale, 
+  LayoutDashboard,
+  ShoppingCart 
+} from 'lucide-react';
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('uf_theme') || 'light');
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [showLanding, setShowLanding] = useState(true);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -31,19 +45,6 @@ export default function App() {
 
   const isStaff = user?.role === 'admin' || user?.role === 'accountant';
 
-  const allTabs = [
-    ...(isStaff ? [
-      { id: 'dashboard', label: 'Admin Dashboard', icon: LayoutDashboard },
-      { id: 'reports', label: 'Reports & Statements', icon: Scale }
-    ] : []),
-    { id: 'contacts', label: 'Contact Master', icon: Users },
-    { id: 'products', label: 'Product Master', icon: Package },
-    { id: 'accounts', label: 'Chart of Accounts', icon: BookOpen },
-    { id: 'journals', label: 'Journals Master', icon: BookMarked },
-    { id: 'tax-rates', label: 'Tax Rates', icon: Percent },
-    { id: 'analytic-accounts', label: 'Analytic Accounts', icon: PieChart },
-  ];
-
   // If role is contact and activeTab is reports or dashboard, fallback to contacts
   useEffect(() => {
     if (user && !isStaff && (activeTab === 'reports' || activeTab === 'dashboard')) {
@@ -56,8 +57,25 @@ export default function App() {
   };
 
   if (!user) {
-    return <AuthPage />;
+    if (showLanding) {
+      return <LandingPage onEnter={() => setShowLanding(false)} />;
+    }
+    return <AuthPage onBack={() => setShowLanding(true)} />;
   }
+
+  const allTabs = [
+    ...(isStaff ? [
+      { id: 'dashboard', label: 'Admin Dashboard', icon: LayoutDashboard },
+      { id: 'reports', label: 'Reports & Statements', icon: Scale }
+    ] : []),
+    { id: 'sales-orders', label: 'Sales Orders', icon: ShoppingCart },
+    { id: 'contacts', label: 'Contact Master', icon: Users },
+    { id: 'products', label: 'Product Master', icon: Package },
+    { id: 'accounts', label: 'Chart of Accounts', icon: BookOpen },
+    { id: 'journals', label: 'Journals Master', icon: BookMarked },
+    { id: 'tax-rates', label: 'Tax Rates', icon: Percent },
+    { id: 'analytic-accounts', label: 'Analytic Accounts', icon: PieChart }
+  ];
 
   return (
     <div className="min-h-screen bg-[#FAF6EE] dark:bg-[#120E0C] text-[#2C221E] dark:text-[#F5EFE6] transition-colors duration-200">
@@ -114,6 +132,7 @@ export default function App() {
         <div className="pt-2">
           {activeTab === 'dashboard' && <AdminDashboard onNavigate={setActiveTab} />}
           {activeTab === 'reports' && <ReportsModule />}
+          {activeTab === 'sales-orders' && <SalesOrdersModule />}
           {activeTab === 'contacts' && <ContactsModule />}
           {activeTab === 'products' && <ProductsModule />}
           {activeTab === 'accounts' && <AccountsModule />}
