@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const commonSchema = {
   uuidParam: z.object({
     params: z.object({
-      id: z.string().uuid('Invalid UUID format')
+      id: z.string()
     })
   }),
   paginationQuery: z.object({

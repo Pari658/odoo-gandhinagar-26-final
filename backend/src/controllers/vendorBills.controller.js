@@ -1,0 +1,261 @@
+import { pool } from '../config/supabase.js';
+import { createJournalEntry } from '../services/ledger.service.js';
+
+export const getVendorBills = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const offset = (page - 1) * limit;
+
+    let query = `
+      SELECT vb.*, c.name as vendor_name
+      FROM vendor_bills vb
+      JOIN contacts c ON vb.vendor_id = c.id
+      ORDER BY vb.created_at DESC
+      LIMIT $1 OFFSET $2
+    `;
+    let countQuery = `SELECT COUNT(*) FROM vendor_bills`;
+
+    // Role-based filtering for portal contacts
+    if (req.user && req.user.role === 'contact') {
+      // Find contact ID for this user
+      const contactRes = await pool.query(`SELECT id FROM contacts WHERE user_id = $1`, [req.user.id]);
+      const contactId = contactRes.rows[0]?.id;
+
+      if (!contactId) {
+        return res.json({ success: true, data: { items: [], page: Number(page), pageSize: Number(limit), totalCount: 0 }, error: null });
+      }
+
+      query = `
+        SELECT vb.*, c.name as vendor_name
+        FROM vendor_bills vb
+        JOIN contacts c ON vb.vendor_id = c.id
+        WHERE vb.vendor_id = $3
+        ORDER BY vb.created_at DESC
+        LIMIT $1 OFFSET $2
+      `;
+      countQuery = `SELECT COUNT(*) FROM vendor_bills WHERE vendor_id = $1`;
+      
+      const [vbResult, countResult] = await Promise.all([
+        pool.query(query, [limit, offset, contactId]),
+        pool.query(countQuery, [contactId])
+      ]);
+
+      return returnResponse(res, vbResult, countResult, page, limit);
+    }
+
+    const [vbResult, countResult] = await Promise.all([
+      pool.query(query, [limit, offset]),
+      pool.query(countQuery)
+    ]);
+
+    returnResponse(res, vbResult, countResult, page, limit);
+  } catch (err) {
+    next(err);
+  }
+};
+
+function returnResponse(res, vbResult, countResult, page, limit) {
+  const items = vbResult.rows.map(row => ({
+    id: row.id,
+    number: row.number,
+    vendorName: row.vendor_name,
+    purchaseOrderId: row.purchase_order_id,
+    vendorId: row.vendor_id,
+    billReference: row.bill_reference,
+    invoiceDate: row.invoice_date,
+    dueDate: row.due_date,
+    status: row.status,
+    totalAmount: Number(row.total_amount) || 0,
+    amountPaid: Number(row.amount_paid) || 0,
+    amountDue: Math.max((Number(row.total_amount) || 0) - (Number(row.amount_paid) || 0), 0),
+    state: row.journal_entry_id ? 'posted' : 'draft',
+    paymentStatus: row.status
+  }));
+
+  res.json({
+    success: true,
+    data: {
+      items,
+      page: Number(page),
+      pageSize: Number(limit),
+      totalCount: Number(countResult.rows[0].count)
+    },
+    error: null
+  });
+}
+
+export const createVendorBill = async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const { vendorId, purchaseOrderId, invoiceDate, dueDate, billReference, lines } = req.body;
+    
+    await client.query('BEGIN');
+
+    // Generate number
+    const countRes = await client.query(`SELECT COUNT(*) FROM vendor_bills`);
+    const count = Number(countRes.rows[0].count) + 1;
+    const number = `Bill/${new Date(invoiceDate).getFullYear()}/${count.toString().padStart(4, '0')}`;
+
+    const billResult = await client.query(
+      `INSERT INTO vendor_bills (number, purchase_order_id, vendor_id, bill_reference, invoice_date, due_date, status, total_amount, amount_paid, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 'unpaid', 0, 0, NOW())
+       RETURNING *`,
+      [number, purchaseOrderId || null, vendorId, billReference || null, invoiceDate, dueDate]
+    );
+    
+    const bill = billResult.rows[0];
+    const billLines = [];
+    let totalAmount = 0;
+
+    for (const line of lines) {
+      const lineTotal = line.quantity * line.unitPrice;
+      totalAmount += lineTotal;
+      
+      const vblResult = await client.query(
+        `INSERT INTO vendor_bill_lines (vendor_bill_id, product_id, account_id, analytic_account_id, quantity, unit_price)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [bill.id, line.productId, line.accountId, line.analyticAccountId || null, line.quantity, line.unitPrice]
+      );
+
+      const productRes = await client.query('SELECT name FROM products WHERE id = $1', [line.productId]);
+      const productName = productRes.rows[0]?.name;
+
+      billLines.push({
+        id: vblResult.rows[0].id,
+        productId: line.productId,
+        productName,
+        accountId: line.accountId,
+        analyticAccountId: line.analyticAccountId || null,
+        quantity: line.quantity,
+        unitPrice: Number(line.unitPrice),
+        total: lineTotal
+      });
+    }
+
+    await client.query(`UPDATE vendor_bills SET total_amount = $1 WHERE id = $2`, [totalAmount, bill.id]);
+    await client.query('COMMIT');
+
+    res.status(201).json({
+      success: true,
+      data: {
+        id: bill.id,
+        number: bill.number,
+        purchaseOrderId: bill.purchase_order_id,
+        vendorId: bill.vendor_id,
+        billReference: bill.bill_reference,
+        invoiceDate: bill.invoice_date,
+        dueDate: bill.due_date,
+        status: bill.status,
+        totalAmount,
+        amountPaid: 0,
+        lines: billLines
+      },
+      error: null
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    next(err);
+  } finally {
+    client.release();
+  }
+};
+
+export const confirmVendorBill = async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+
+    await client.query('BEGIN');
+
+    // 1. Fetch Bill details
+    const billRes = await client.query('SELECT * FROM vendor_bills WHERE id = $1', [id]);
+    if (billRes.rowCount === 0) {
+      throw new Error('Vendor bill not found');
+    }
+    const bill = billRes.rows[0];
+
+    if (bill.status !== 'unpaid' && bill.status !== 'draft') {
+       throw new Error('Bill has already been confirmed/posted.');
+    }
+
+    // 2. Fetch Bill lines to construct Journal Entry
+    const linesRes = await client.query('SELECT * FROM vendor_bill_lines WHERE vendor_bill_id = $1', [id]);
+    
+    // We need the Accounts Payable liability account from journals (Purchase Journal)
+    const journalRes = await client.query(`SELECT id, default_credit_account_id FROM journals WHERE type = 'purchase' LIMIT 1`);
+    if (journalRes.rowCount === 0) throw new Error('Purchase Journal not configured');
+    
+    const journalId = journalRes.rows[0].id;
+    const payableAccountId = journalRes.rows[0].default_credit_account_id;
+
+    if (!payableAccountId) {
+       throw new Error('Purchase Journal missing default credit account (Accounts Payable)');
+    }
+
+    const jeLines = [];
+    let totalDebit = 0;
+
+    // Create a debit line for each expense line
+    for (const line of linesRes.rows) {
+      const lineTotal = Number(line.quantity) * Number(line.unit_price);
+      totalDebit += lineTotal;
+
+      jeLines.push({
+        accountId: line.account_id,
+        partnerId: bill.vendor_id,
+        analyticAccountId: line.analytic_account_id,
+        debit: lineTotal,
+        credit: 0
+      });
+    }
+
+    // Create a single credit line for Accounts Payable
+    jeLines.push({
+      accountId: payableAccountId,
+      partnerId: bill.vendor_id,
+      analyticAccountId: null,
+      debit: 0,
+      credit: totalDebit
+    });
+
+    // 3. Create the Journal Entry
+    const je = await createJournalEntry(client, {
+      entryDate: bill.invoice_date,
+      journalId,
+      status: 'posted',
+      lines: jeLines,
+      sourceType: 'vendor_bill',
+      sourceId: bill.id
+    });
+
+    // 4. Link JE to Bill and update status
+    await client.query(
+      `UPDATE vendor_bills SET status = 'unpaid', journal_entry_id = $2 WHERE id = $1`,
+      [id, je.id]
+    );
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      data: {
+        id: bill.id,
+        status: 'unpaid',
+        journalEntryId: je.id
+      },
+      error: null
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    if (err.message === 'Vendor bill not found') {
+       res.status(404).json({ success: false, data: null, error: { code: 'NOT_FOUND', message: err.message } });
+    } else if (err.code === 'UNBALANCED_ENTRY') {
+       res.status(400).json({ success: false, data: null, error: { code: 'UNBALANCED_ENTRY', message: err.message } });
+    } else {
+       next(err);
+    }
+  } finally {
+    client.release();
+  }
+};
