@@ -10,6 +10,8 @@ import journalsRoutes from './routes/journals.routes.js';
 import taxRatesRoutes from './routes/taxRates.routes.js';
 import analyticAccountsRoutes from './routes/analyticAccounts.routes.js';
 import salesOrdersRoutes from './routes/salesOrders.routes.js';
+import reportsRoutes from './routes/reports.routes.js';
+import budgetsRoutes from './routes/budgets.routes.js';
 
 const app = express();
 
@@ -45,6 +47,8 @@ app.use(['/api/v1/journals', '/api/journals', '/journals'], journalsRoutes);
 app.use(['/api/v1/tax-rates', '/api/tax-rates', '/tax-rates'], taxRatesRoutes);
 app.use(['/api/v1/analytic-accounts', '/api/analytic-accounts', '/analytic-accounts'], analyticAccountsRoutes);
 app.use(['/api/v1/sales-orders', '/api/sales-orders', '/sales-orders'], salesOrdersRoutes);
+app.use(['/api/v1/reports', '/api/reports', '/reports'], reportsRoutes);
+app.use(['/api/v1/budgets', '/api/budgets', '/budgets'], budgetsRoutes);
 
 // ---------------------------------------------------------------------------
 // 404 — Catch-all for unmatched routes
