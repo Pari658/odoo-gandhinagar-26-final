@@ -72,7 +72,6 @@ export default function AuthPage() {
           loginId: cleanLoginId,
           email: cleanEmail,
           password,
-          confirmPassword,
           role
         });
         setSuccessMsg('Account created successfully!');
@@ -256,29 +255,62 @@ export default function AuthPage() {
                       required
                       placeholder="••••••••"
                       value={password}
-                      onChange={e => setPassword(e.target.value)}
+                      onChange={e => {
+                        setPassword(e.target.value);
+                        if (errorMsg) setErrorMsg(null);
+                      }}
                       className="w-full px-3 py-2.5 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6] focus:outline-none focus:ring-2 focus:ring-[#B45309]"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
-                      Re-enter Password *
+                    <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 flex items-center justify-between">
+                      <span>Re-enter Password *</span>
+                      {confirmPassword && (
+                        password === confirmPassword ? (
+                          <span className="text-[10px] text-emerald-600 font-bold">✓ Match</span>
+                        ) : (
+                          <span className="text-[10px] text-red-500 font-bold">✕ Mismatch</span>
+                        )
+                      )}
                     </label>
                     <input
                       type="password"
                       required
                       placeholder="••••••••"
                       value={confirmPassword}
-                      onChange={e => setConfirmPassword(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6] focus:outline-none focus:ring-2 focus:ring-[#B45309]"
+                      onChange={e => {
+                        setConfirmPassword(e.target.value);
+                        if (errorMsg) setErrorMsg(null);
+                      }}
+                      className={`w-full px-3 py-2.5 rounded-lg border bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6] focus:outline-none focus:ring-2 ${
+                        confirmPassword ? (
+                          password === confirmPassword 
+                            ? 'border-emerald-500 focus:ring-emerald-500' 
+                            : 'border-red-500 focus:ring-red-500'
+                        ) : 'border-[#E6DFD5] dark:border-[#382D27] focus:ring-[#B45309]'
+                      }`}
                     />
                   </div>
                 </div>
 
-                <p className="text-[10px] text-[#6B5E55] dark:text-[#A89B91]">
-                  * Password requirements: At least 9 characters long, containing uppercase, lowercase, and special characters.
-                </p>
+                <div className="p-2.5 rounded-lg border border-[#E6DFD5]/70 dark:border-[#382D27] bg-[#FAF6EE]/50 dark:bg-[#29211D]/40 text-[10px] space-y-1">
+                  <span className="font-semibold block text-[#6B5E55] dark:text-[#A89B91]">Password Requirements:</span>
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                    <span className={password.length > 8 ? 'text-emerald-600 font-semibold' : 'text-slate-400'}>
+                      {password.length > 8 ? '✓' : '•'} Length &gt; 8 chars
+                    </span>
+                    <span className={/[a-z]/.test(password) ? 'text-emerald-600 font-semibold' : 'text-slate-400'}>
+                      {/[a-z]/.test(password) ? '✓' : '•'} Lowercase letter (a-z)
+                    </span>
+                    <span className={/[A-Z]/.test(password) ? 'text-emerald-600 font-semibold' : 'text-slate-400'}>
+                      {/[A-Z]/.test(password) ? '✓' : '•'} Uppercase letter (A-Z)
+                    </span>
+                    <span className={/[^A-Za-z0-9]/.test(password) ? 'text-emerald-600 font-semibold' : 'text-slate-400'}>
+                      {/[^A-Za-z0-9]/.test(password) ? '✓' : '•'} Special char (!@#...)
+                    </span>
+                  </div>
+                </div>
 
                 {/* Account Category Selection */}
                 <div>
