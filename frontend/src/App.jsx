@@ -10,6 +10,7 @@ import PurchaseOrdersModule from './components/PurchaseOrdersModule.jsx';
 import VendorBillsModule from './components/VendorBillsModule.jsx';
 import SalesOrdersModule from './components/SalesOrdersModule.jsx';
 import ReportsModule from './components/ReportsModule.jsx';
+import BudgetModule from './components/BudgetModule.jsx';
 import AdminDashboard from './components/AdminDashboard.jsx';
 import AuthPage from './components/AuthPage.jsx';
 import LandingPage from './components/LandingPage.jsx';
@@ -27,7 +28,8 @@ import {
   ShoppingCart,
   Sun,
   Moon,
-  FileText
+  FileText,
+  Wallet
 } from 'lucide-react';
 
 export default function App() {
@@ -81,7 +83,8 @@ export default function App() {
     { id: 'tax-rates', label: 'Tax Rates', icon: Percent },
     { id: 'analytic-accounts', label: 'Analytic Accounts', icon: PieChart },
     { id: 'purchase-orders', label: 'Purchase Orders', icon: ShoppingCart },
-    { id: 'vendor-bills', label: 'Vendor Bills', icon: FileText }
+    { id: 'vendor-bills', label: 'Vendor Bills', icon: FileText },
+    { id: 'budget', label: 'Budget', icon: Wallet }
   ];
 
   return (
@@ -127,6 +130,7 @@ export default function App() {
           {activeTab === 'analytic-accounts' && <AnalyticAccountsModule />}
           {activeTab === 'purchase-orders' && <PurchaseOrdersModule />}
           {activeTab === 'vendor-bills' && <VendorBillsModule />}
+          {activeTab === 'budget' && <BudgetModule />}
         </div>
       </main>
     </div>
