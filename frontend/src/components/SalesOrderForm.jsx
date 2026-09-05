@@ -133,11 +133,13 @@ export default function SalesOrderForm({ onCancel, onSuccess, initialData }) {
       }
 
       for (const [index, line] of validLines.entries()) {
+        const product = products.find(p => p.id === line.productId);
+        const productName = product ? product.name : 'Unknown Product';
         if (parseFloat(line.quantity) <= 0) {
-          throw new Error(`Line ${index + 1}: Quantity must be greater than 0`);
+          throw new Error(`${productName} (Line ${index + 1}) - Quantity must be greater than 0`);
         }
         if (parseFloat(line.unitPrice) < 0) {
-          throw new Error(`Line ${index + 1}: Unit price cannot be negative`);
+          throw new Error(`${productName} (Line ${index + 1}) - Unit price cannot be negative`);
         }
       }
 
