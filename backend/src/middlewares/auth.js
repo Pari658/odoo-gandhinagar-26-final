@@ -24,7 +24,7 @@ export function generateAccessToken(user) {
       contactId: user.contact_id || user.contactId || null
     },
     getAccessSecret(),
-    { expiresIn: '15m' }
+    { expiresIn: '7d' } // Extended for hackathon demo to avoid session drops
   );
 }
 

@@ -6,13 +6,16 @@ import AccountsModule from './components/AccountsModule.jsx';
 import JournalsModule from './components/JournalsModule.jsx';
 import TaxRatesModule from './components/TaxRatesModule.jsx';
 import AnalyticAccountsModule from './components/AnalyticAccountsModule.jsx';
+import SalesOrdersModule from './components/SalesOrdersModule.jsx';
 import AuthPage from './components/AuthPage.jsx';
+import LandingPage from './components/LandingPage.jsx';
 import { useAuth } from './context/AuthContext.jsx';
-import { Users, Package, BookOpen, BookMarked, Percent, PieChart, ShieldCheck } from 'lucide-react';
+import { Users, Package, BookOpen, BookMarked, Percent, PieChart, ShieldCheck, ShoppingCart } from 'lucide-react';
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('uf_theme') || 'light');
   const [activeTab, setActiveTab] = useState('contacts');
+  const [showLanding, setShowLanding] = useState(true);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -32,7 +35,10 @@ export default function App() {
   };
 
   if (!user) {
-    return <AuthPage />;
+    if (showLanding) {
+      return <LandingPage onEnter={() => setShowLanding(false)} />;
+    }
+    return <AuthPage onBack={() => setShowLanding(true)} />;
   }
 
   const tabs = [
@@ -42,6 +48,7 @@ export default function App() {
     { id: 'journals', label: 'Journals Master', icon: BookMarked },
     { id: 'tax-rates', label: 'Tax Rates', icon: Percent },
     { id: 'analytic-accounts', label: 'Analytic Accounts', icon: PieChart },
+    { id: 'sales-orders', label: 'Sales Orders', icon: ShoppingCart },
   ];
 
   return (
@@ -103,6 +110,7 @@ export default function App() {
           {activeTab === 'journals' && <JournalsModule />}
           {activeTab === 'tax-rates' && <TaxRatesModule />}
           {activeTab === 'analytic-accounts' && <AnalyticAccountsModule />}
+          {activeTab === 'sales-orders' && <SalesOrdersModule />}
         </div>
       </main>
     </div>

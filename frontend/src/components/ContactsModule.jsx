@@ -99,6 +99,8 @@ export default function ContactsModule() {
         <div className="relative flex-1 w-full">
           <Search className="w-4 h-4 absolute left-3 top-2.5 text-[#9E9085]" />
           <input
+            id="search-contacts"
+            name="search-contacts"
             type="text"
             placeholder="Search contacts by name, email, or city..."
             value={search}
@@ -108,6 +110,8 @@ export default function ContactsModule() {
         </div>
 
         <select
+          id="filter-contacts"
+          name="filter-contacts"
           value={filterType}
           onChange={e => setFilterType(e.target.value)}
           className="w-full sm:w-48 px-3 py-2 text-xs rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-white dark:bg-[#1C1613] text-[#2C221E] dark:text-[#F5EFE6]"
@@ -192,8 +196,10 @@ export default function ContactsModule() {
 
             <form onSubmit={handleCreate} className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Contact Name *</label>
+                <label htmlFor="contactName" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Contact Name *</label>
                 <input
+                  id="contactName"
+                  name="contactName"
                   type="text"
                   required
                   placeholder="e.g. Azure Furniture Ltd."
@@ -205,8 +211,10 @@ export default function ContactsModule() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Contact Type *</label>
+                  <label htmlFor="contactType" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Contact Type *</label>
                   <select
+                    id="contactType"
+                    name="contactType"
                     value={formData.type}
                     onChange={e => setFormData({ ...formData, type: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D]"
@@ -217,8 +225,10 @@ export default function ContactsModule() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mobile Number</label>
+                  <label htmlFor="mobile" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Mobile Number</label>
                   <input
+                    id="mobile"
+                    name="mobile"
                     type="text"
                     placeholder="9876543210"
                     value={formData.mobile}
@@ -229,10 +239,12 @@ export default function ContactsModule() {
               </div>
 
               <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                <label htmlFor="email" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                   Email Address <span className="text-emerald-600 font-normal">(Auto-provisions Portal Login)</span>
                 </label>
                 <input
+                  id="email"
+                  name="email"
                   type="email"
                   placeholder="contact@company.com"
                   value={formData.email}
@@ -243,8 +255,10 @@ export default function ContactsModule() {
 
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">City</label>
+                  <label htmlFor="city" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">City</label>
                   <input
+                    id="city"
+                    name="city"
                     type="text"
                     placeholder="Ahmedabad"
                     value={formData.city}
@@ -253,8 +267,10 @@ export default function ContactsModule() {
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">State</label>
+                  <label htmlFor="state" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">State</label>
                   <input
+                    id="state"
+                    name="state"
                     type="text"
                     placeholder="Gujarat"
                     value={formData.state}
@@ -263,8 +279,10 @@ export default function ContactsModule() {
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Pincode</label>
+                  <label htmlFor="pincode" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Pincode</label>
                   <input
+                    id="pincode"
+                    name="pincode"
                     type="text"
                     placeholder="380001"
                     value={formData.pincode}
@@ -275,8 +293,10 @@ export default function ContactsModule() {
               </div>
 
               <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Profile Image URL</label>
+                <label htmlFor="profileImageUrl" className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Profile Image URL</label>
                 <input
+                  id="profileImageUrl"
+                  name="profileImageUrl"
                   type="text"
                   placeholder="https://..."
                   value={formData.profileImageUrl}
