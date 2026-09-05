@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { Sun, Moon, LogOut, LogIn, Armchair, Key, Menu, X, User } from 'lucide-react';
+import { Sun, Moon, LogOut, LogIn, Armchair, Key, Menu, X, User, Eye, EyeOff } from 'lucide-react';
 
 export default function Sidebar({ theme, toggleTheme, activeTab, setActiveTab, allTabs }) {
   const { user, login, logout, loading } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -156,13 +157,23 @@ export default function Sidebar({ theme, toggleTheme, activeTab, setActiveTab, a
               </div>
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Password</label>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] focus:ring-2 focus:ring-[#B45309] outline-none"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    className="w-full px-3 py-2 pr-10 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] focus:ring-2 focus:ring-[#B45309] outline-none text-[#2C221E] dark:text-[#F5EFE6]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B5E55] dark:text-[#A89B91] hover:text-[#B45309] cursor-pointer"
+                    title={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
               <button
                 type="submit"
