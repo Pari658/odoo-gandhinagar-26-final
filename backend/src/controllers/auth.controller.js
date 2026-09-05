@@ -30,7 +30,7 @@ export async function login(req, res) {
 
   // 1. Single JOIN Query: Fetch User + Linked Contact in 1 DB Roundtrip
   try {
-    const dbRes = await query(
+    const dbRes = await pool.query(
       `SELECT u.id, u.login_id, u.email, u.password_hash, u.role, u.is_active, u.created_at,
               c.id AS contact_id, c.name AS contact_name, c.type AS contact_type
        FROM users u
@@ -62,13 +62,8 @@ export async function login(req, res) {
     console.warn('Supabase DB user query warning:', err.message);
   }
 
-  // 2. Fallback to inMemoryStore if not found in DB
-  if (!user) {
-    user = inMemoryStore.users.find(u =>
-      u.email?.toLowerCase() === loginInput.trim().toLowerCase() ||
-      u.login_id?.toLowerCase() === loginInput.trim().toLowerCase()
-    );
-  }
+  // 2. DB fallback removed as we are completely on Postgres
+
 
   // 3. Verify password
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
@@ -81,11 +76,7 @@ export async function login(req, res) {
     });
   }
 
-  if (!linkedContact) {
-    linkedContact = inMemoryStore.contacts.find(c =>
-      c.id === user.contact_id || c.email?.toLowerCase() === user.email.toLowerCase()
-    );
-  }
+  // (Contact fallback removed)
 
   const tokenUserPayload = {
     id: user.id,
@@ -164,7 +155,7 @@ export async function signup(req, res) {
 
   // 4. Single SQL Query Duplicate Check (Checks Login ID & Email in 1 DB Roundtrip)
   try {
-    const dupRes = await query(
+    const dupRes = await pool.query(
       'SELECT login_id, email FROM users WHERE LOWER(login_id) = LOWER($1) OR LOWER(email) = LOWER($2)',
       [cleanLoginId, cleanEmail]
     );
@@ -196,30 +187,7 @@ export async function signup(req, res) {
     console.warn('Duplicate check warning:', e.message);
   }
 
-  const memDupLogin = inMemoryStore.users.find(u => u.login_id?.toLowerCase() === cleanLoginId.toLowerCase());
-  if (memDupLogin) {
-    return res.status(409).json({
-      success: false,
-      error: {
-        code: 'CONFLICT',
-        message: 'Login Id should be unique and already exists in database',
-        field: 'loginId'
-      }
-    });
-  }
-
-  const memDupEmail = inMemoryStore.users.find(u => u.email.toLowerCase() === cleanEmail.toLowerCase());
-  if (memDupEmail) {
-    return res.status(409).json({
-      success: false,
-      error: {
-        code: 'CONFLICT',
-        message: 'Email Id should not be a duplicate in database',
-        field: 'email'
-      }
-    });
-  }
-
+  // Fallback memory checks removed
   const userRole = role && ['customer', 'vendor', 'both'].includes(role) ? role : 'customer';
   const passwordHash = bcrypt.hashSync(password, 10);
   const contactName = name && name.trim() ? name.trim() : cleanLoginId;
