@@ -280,11 +280,11 @@ export default function SalesOrderForm({ onCancel, onSuccess, initialData }) {
                             name={`product-${line.id}`}
                             value={line.productId}
                             onChange={(e) => handleLineChange(line.id, 'productId', e.target.value)}
-                            className="w-full px-2 py-1.5 rounded bg-transparent border border-transparent hover:border-[#E6DFD5] focus:border-[#B45309] outline-none transition-colors"
+                            className="w-full px-2 py-1.5 rounded bg-transparent dark:bg-[#1C1613] border border-transparent hover:border-[#E6DFD5] dark:hover:border-[#382D27] focus:border-[#B45309] outline-none transition-colors"
                           >
-                            <option value="">Select product...</option>
+                            <option value="" className="bg-white dark:bg-[#1C1613]">Select product...</option>
                             {products.map(p => (
-                              <option key={p.id} value={p.id}>{p.name}</option>
+                              <option key={p.id} value={p.id} className="bg-white dark:bg-[#1C1613]">{p.name}</option>
                             ))}
                           </select>
                         </td>
@@ -318,11 +318,11 @@ export default function SalesOrderForm({ onCancel, onSuccess, initialData }) {
                             name={`tax-${line.id}`}
                             value={line.taxRateId}
                             onChange={(e) => handleLineChange(line.id, 'taxRateId', e.target.value)}
-                            className="w-full px-2 py-1.5 rounded bg-transparent border border-transparent hover:border-[#E6DFD5] focus:border-[#B45309] outline-none transition-colors text-xs"
+                            className="w-full px-2 py-1.5 rounded bg-transparent dark:bg-[#1C1613] border border-transparent hover:border-[#E6DFD5] dark:hover:border-[#382D27] focus:border-[#B45309] outline-none transition-colors text-xs"
                           >
-                            <option value="">No Tax</option>
+                            <option value="" className="bg-white dark:bg-[#1C1613]">No Tax</option>
                             {taxRates.map(t => (
-                              <option key={t.id} value={t.id}>{t.name} ({t.ratePercent}%)</option>
+                              <option key={t.id} value={t.id} className="bg-white dark:bg-[#1C1613]">{t.name} ({t.ratePercent}%)</option>
                             ))}
                           </select>
                         </td>
