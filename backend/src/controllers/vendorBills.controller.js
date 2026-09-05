@@ -259,3 +259,139 @@ export const confirmVendorBill = async (req, res, next) => {
     client.release();
   }
 };
+
+export const getVendorBillById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const billResult = await pool.query(`
+      SELECT vb.*, c.name as vendor_name, c.email as vendor_email, po.number as purchase_order_number
+      FROM vendor_bills vb
+      LEFT JOIN contacts c ON vb.vendor_id = c.id
+      LEFT JOIN purchase_orders po ON vb.purchase_order_id = po.id
+      WHERE vb.id = $1
+    `, [id]);
+
+    if (billResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'Vendor bill not found' }
+      });
+    }
+
+    const bill = billResult.rows[0];
+
+    const linesResult = await pool.query(`
+      SELECT vbl.*, p.name as product_name, a.name as account_name, aa.name as analytic_account_name
+      FROM vendor_bill_lines vbl
+      LEFT JOIN products p ON vbl.product_id = p.id
+      LEFT JOIN chart_of_accounts a ON vbl.account_id = a.id
+      LEFT JOIN analytic_accounts aa ON vbl.analytic_account_id = aa.id
+      WHERE vbl.vendor_bill_id = $1
+    `, [id]);
+
+    const lines = linesResult.rows.map(l => ({
+      id: l.id,
+      productId: l.product_id,
+      productName: l.product_name || 'Standard Expense Item',
+      accountId: l.account_id,
+      accountName: l.account_name || 'Expense Account',
+      analyticAccountId: l.analytic_account_id,
+      analyticAccountName: l.analytic_account_name || null,
+      quantity: Number(l.quantity),
+      unitPrice: Number(l.unit_price),
+      total: Number(l.quantity) * Number(l.unit_price)
+    }));
+
+    const totalAmount = Number(bill.total_amount) || 0;
+    const amountPaid = Number(bill.amount_paid) || 0;
+
+    res.json({
+      success: true,
+      data: {
+        id: bill.id,
+        number: bill.number,
+        vendorId: bill.vendor_id,
+        vendorName: bill.vendor_name,
+        vendorEmail: bill.vendor_email,
+        purchaseOrderId: bill.purchase_order_id,
+        purchaseOrderNumber: bill.purchase_order_number,
+        billReference: bill.bill_reference,
+        invoiceDate: bill.invoice_date,
+        dueDate: bill.due_date,
+        status: bill.status,
+        totalAmount,
+        amountPaid,
+        amountDue: Math.max(totalAmount - amountPaid, 0),
+        journalEntryId: bill.journal_entry_id,
+        createdAt: bill.created_at,
+        lines
+      },
+      error: null
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const deleteVendorBill = async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+
+    await client.query('BEGIN');
+
+    // Fetch bill to check journal entry
+    const billRes = await client.query('SELECT * FROM vendor_bills WHERE id = $1', [id]);
+    if (billRes.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'Vendor bill not found' }
+      });
+    }
+
+    const bill = billRes.rows[0];
+
+    // 1. Delete associated payments & their journal entries
+    const payRes = await client.query('SELECT id, journal_entry_id FROM payments WHERE vendor_bill_id = $1', [id]);
+    for (const pay of payRes.rows) {
+      if (pay.journal_entry_id) {
+        await client.query('DELETE FROM journal_entry_lines WHERE journal_entry_id = $1', [pay.journal_entry_id]);
+        await client.query('DELETE FROM journal_entries WHERE id = $1', [pay.journal_entry_id]);
+      }
+    }
+    await client.query('DELETE FROM payments WHERE vendor_bill_id = $1', [id]);
+
+    // 2. Delete vendor bill lines
+    await client.query('DELETE FROM vendor_bill_lines WHERE vendor_bill_id = $1', [id]);
+
+    // 3. Clear journal entry pointer to avoid FK circular dependency
+    await client.query('UPDATE vendor_bills SET journal_entry_id = NULL WHERE id = $1', [id]);
+
+    // 4. Delete vendor bill record
+    await client.query('DELETE FROM vendor_bills WHERE id = $1', [id]);
+
+    // 5. Delete linked journal entry if any
+    if (bill.journal_entry_id) {
+      await client.query('DELETE FROM journal_entry_lines WHERE journal_entry_id = $1', [bill.journal_entry_id]);
+      await client.query('DELETE FROM journal_entries WHERE id = $1', [bill.journal_entry_id]);
+    }
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      data: { id, message: 'Vendor bill and linked records deleted successfully' },
+      error: null
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    next(err);
+  } finally {
+    client.release();
+  }
+};
+

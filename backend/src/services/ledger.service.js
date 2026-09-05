@@ -36,10 +36,10 @@ export async function createJournalEntry(client, data) {
   const entryNumber = `JE/${new Date(entryDate).getFullYear()}/${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
 
   const jeResult = await client.query(
-    `INSERT INTO journal_entries (number, journal_id, entry_date, status, total, source_type, source_id, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+    `INSERT INTO journal_entries (number, journal_id, entry_date, status, source_type, source_id, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, NOW())
      RETURNING id, number, status`,
-    [entryNumber, journalId, entryDate, status, totalDebit, data.sourceType, data.sourceId]
+    [entryNumber, journalId, entryDate, status, data.sourceType, data.sourceId]
   );
   
   const je = jeResult.rows[0];
