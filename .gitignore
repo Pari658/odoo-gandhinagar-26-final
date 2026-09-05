@@ -1,25 +1,29 @@
-# Dependencies
-node_modules/
-.pnpm-store/
-
-# Environment Variables
+# Environment variables
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*.local
+*.env
 
-# Build Outputs
-dist/
-build/
-*.log
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# System & IDE files
+# OS / System files
 .DS_Store
+Thumbs.db
+
+# IDE & Editor directories
 .vscode/
 .idea/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
 *.swp
+*.swo
+
+# Build outputs & cache
+dist/
+build/
+.cache/
+
+backend-master.md
+json-struct.md

@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { apiLimiter } from './middlewares/rateLimit.js';
 
 import authRoutes from './routes/auth.routes.js';
 import contactsRoutes from './routes/contacts.routes.js';
@@ -17,6 +18,7 @@ const app = express();
 // ---------------------------------------------------------------------------
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+app.use('/api', apiLimiter);
 
 // ---------------------------------------------------------------------------
 // Health Check
