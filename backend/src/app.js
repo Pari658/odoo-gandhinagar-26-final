@@ -9,13 +9,16 @@ import accountsRoutes from './routes/accounts.routes.js';
 import journalsRoutes from './routes/journals.routes.js';
 import taxRatesRoutes from './routes/taxRates.routes.js';
 import analyticAccountsRoutes from './routes/analyticAccounts.routes.js';
+import purchaseOrdersRoutes from './routes/purchaseOrders.routes.js';
+import vendorBillsRoutes from './routes/vendorBills.routes.js';
+import paymentsRoutes from './routes/payments.routes.js';
 
 const app = express();
 
 // ---------------------------------------------------------------------------
 // Global Middleware
 // ---------------------------------------------------------------------------
-app.use(cors());
+app.use(cors({ origin: ['http://localhost:3000', 'http://0.0.0.0:3000'] }));
 app.use(express.json({ limit: '10mb' }));
 app.use('/api', apiLimiter);
 
@@ -43,8 +46,12 @@ app.use(['/api/v1/accounts', '/api/accounts', '/accounts'], accountsRoutes);
 app.use(['/api/v1/journals', '/api/journals', '/journals'], journalsRoutes);
 app.use(['/api/v1/tax-rates', '/api/tax-rates', '/tax-rates'], taxRatesRoutes);
 app.use(['/api/v1/analytic-accounts', '/api/analytic-accounts', '/analytic-accounts'], analyticAccountsRoutes);
+app.use(['/api/v1/purchase-orders', '/api/purchase-orders', '/purchase-orders'], purchaseOrdersRoutes);
+app.use(['/api/v1/vendor-bills', '/api/vendor-bills', '/vendor-bills'], vendorBillsRoutes);
+app.use(['/api/v1/payments', '/api/payments', '/payments'], paymentsRoutes);
 
 // ---------------------------------------------------------------------------
+
 // 404 — Catch-all for unmatched routes
 // ---------------------------------------------------------------------------
 app.use((req, res) => {

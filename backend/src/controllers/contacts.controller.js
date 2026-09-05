@@ -1,230 +1,255 @@
 import bcrypt from 'bcryptjs';
-import { inMemoryStore, query } from '../db/index.js';
+import { pool } from '../config/supabase.js';
 
-export async function getContacts(req, res) {
-  const { type, page = 1, pageSize = 20, search } = req.query;
-  const pageNum = parseInt(page, 10) || 1;
-  const limit = parseInt(pageSize, 10) || 20;
+export async function getContacts(req, res, next) {
+  try {
+    const { type, page = 1, pageSize = 20, search } = req.query;
+    const pageNum = parseInt(page, 10) || 1;
+    const limit = parseInt(pageSize, 10) || 20;
+    const offset = (pageNum - 1) * limit;
 
-  let items = [...inMemoryStore.contacts];
+    let queryStr = `SELECT * FROM contacts WHERE 1=1`;
+    let countQueryStr = `SELECT COUNT(*) FROM contacts WHERE 1=1`;
+    const params = [];
 
-  if (type) {
-    items = items.filter(c => c.type === type || c.type === 'both');
-  }
-
-  if (search) {
-    const q = search.toLowerCase();
-    items = items.filter(c => 
-      c.name.toLowerCase().includes(q) || 
-      (c.email && c.email.toLowerCase().includes(q)) ||
-      (c.city && c.city.toLowerCase().includes(q))
-    );
-  }
-
-  const totalCount = items.length;
-  const paginated = items.slice((pageNum - 1) * limit, pageNum * limit).map(c => ({
-    id: c.id,
-    userId: c.user_id || null,
-    name: c.name,
-    type: c.type,
-    email: c.email || null,
-    mobile: c.mobile || null,
-    city: c.city || null,
-    state: c.state || null,
-    pincode: c.pincode || null,
-    profileImageUrl: c.profile_image_url || null,
-    isArchived: Boolean(c.is_archived),
-    createdAt: c.created_at
-  }));
-
-  return res.json({
-    success: true,
-    data: {
-      items: paginated,
-      page: pageNum,
-      pageSize: limit,
-      totalCount
-    },
-    error: null
-  });
-}
-
-export async function getContactById(req, res) {
-  const { id } = req.params;
-  const contact = inMemoryStore.contacts.find(c => c.id === id);
-
-  if (!contact) {
-    return res.status(404).json({
-      success: false,
-      data: null,
-      error: {
-        code: 'NOT_FOUND',
-        message: `Contact with ID '${id}' not found`
-      }
-    });
-  }
-
-  return res.json({
-    success: true,
-    data: {
-      id: contact.id,
-      userId: contact.user_id || null,
-      name: contact.name,
-      type: contact.type,
-      email: contact.email || null,
-      mobile: contact.mobile || null,
-      city: contact.city || null,
-      state: contact.state || null,
-      pincode: contact.pincode || null,
-      profileImageUrl: contact.profile_image_url || null,
-      isArchived: Boolean(contact.is_archived),
-      createdAt: contact.created_at
-    },
-    error: null
-  });
-}
-
-export async function createContact(req, res) {
-  const { name, type, email, mobile, city, state, pincode, profileImageUrl } = req.body;
-
-  if (!name || !type) {
-    return res.status(400).json({
-      success: false,
-      data: null,
-      error: {
-        code: 'VALIDATION_ERROR',
-        message: 'Name and type (customer/vendor/both) are required fields',
-        field: !name ? 'name' : 'type'
-      }
-    });
-  }
-
-  const newId = `c-${Date.now().toString().slice(-4)}`;
-  let provisionedUserId = null;
-
-  if (email) {
-    const existingUser = inMemoryStore.users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (!existingUser) {
-      const newUserId = `u-${Date.now().toString().slice(-4)}`;
-      const newUser = {
-        id: newUserId,
-        email: email,
-        password_hash: bcrypt.hashSync('password123', 10),
-        role: 'contact',
-        contact_id: newId,
-        is_active: true,
-        created_at: new Date().toISOString()
-      };
-      inMemoryStore.users.push(newUser);
-      provisionedUserId = newUserId;
-    } else {
-      provisionedUserId = existingUser.id;
+    if (type) {
+      params.push(type);
+      queryStr += ` AND (type = $${params.length} OR type = 'both')`;
+      countQueryStr += ` AND (type = $${params.length} OR type = 'both')`;
     }
+
+    if (search) {
+      params.push(`%${search.toLowerCase()}%`);
+      const searchClause = ` AND (LOWER(name) LIKE $${params.length} OR LOWER(email) LIKE $${params.length} OR LOWER(city) LIKE $${params.length})`;
+      queryStr += searchClause;
+      countQueryStr += searchClause;
+    }
+
+    queryStr += ` ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+
+    const [itemsResult, countResult] = await Promise.all([
+      pool.query(queryStr, params),
+      pool.query(countQueryStr, params)
+    ]);
+
+    const paginated = itemsResult.rows.map(c => ({
+      id: c.id,
+      userId: c.user_id,
+      name: c.name,
+      type: c.type,
+      email: c.email,
+      mobile: c.mobile,
+      city: c.city,
+      state: c.state,
+      pincode: c.pincode,
+      profileImageUrl: c.profile_image_url,
+      isArchived: c.is_archived,
+      createdAt: c.created_at
+    }));
+
+    return res.json({
+      success: true,
+      data: {
+        items: paginated,
+        page: pageNum,
+        pageSize: limit,
+        totalCount: Number(countResult.rows[0].count)
+      },
+      error: null
+    });
+  } catch (err) {
+    next(err);
   }
-
-  const newContact = {
-    id: newId,
-    user_id: provisionedUserId,
-    name,
-    type,
-    email: email || null,
-    mobile: mobile || null,
-    city: city || null,
-    state: state || null,
-    pincode: pincode || null,
-    profile_image_url: profileImageUrl || null,
-    is_archived: false,
-    created_at: new Date().toISOString()
-  };
-
-  inMemoryStore.contacts.unshift(newContact);
-
-  return res.status(201).json({
-    success: true,
-    data: {
-      id: newContact.id,
-      userId: newContact.user_id,
-      name: newContact.name,
-      type: newContact.type,
-      email: newContact.email,
-      mobile: newContact.mobile,
-      city: newContact.city,
-      state: newContact.state,
-      pincode: newContact.pincode,
-      profileImageUrl: newContact.profile_image_url,
-      isArchived: false,
-      autoProvisionedUser: Boolean(provisionedUserId),
-      createdAt: newContact.created_at
-    },
-    error: null
-  });
 }
 
-export async function updateContact(req, res) {
-  const { id } = req.params;
-  const index = inMemoryStore.contacts.findIndex(c => c.id === id);
+export async function getContactById(req, res, next) {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('SELECT * FROM contacts WHERE id = $1', [id]);
 
-  if (index === -1) {
-    return res.status(404).json({
-      success: false,
-      data: null,
-      error: {
-        code: 'NOT_FOUND',
-        message: `Contact with ID '${id}' not found`
-      }
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: {
+          code: 'NOT_FOUND',
+          message: `Contact with ID '${id}' not found`
+        }
+      });
+    }
+
+    const c = result.rows[0];
+    return res.json({
+      success: true,
+      data: {
+        id: c.id,
+        userId: c.user_id,
+        name: c.name,
+        type: c.type,
+        email: c.email,
+        mobile: c.mobile,
+        city: c.city,
+        state: c.state,
+        pincode: c.pincode,
+        profileImageUrl: c.profile_image_url,
+        isArchived: c.is_archived,
+        createdAt: c.created_at
+      },
+      error: null
     });
+  } catch (err) {
+    next(err);
   }
-
-  const existing = inMemoryStore.contacts[index];
-  const updated = {
-    ...existing,
-    ...req.body,
-    profile_image_url: req.body.profileImageUrl !== undefined ? req.body.profileImageUrl : existing.profile_image_url
-  };
-
-  inMemoryStore.contacts[index] = updated;
-
-  return res.json({
-    success: true,
-    data: {
-      id: updated.id,
-      name: updated.name,
-      type: updated.type,
-      email: updated.email,
-      mobile: updated.mobile,
-      city: updated.city,
-      state: updated.state,
-      pincode: updated.pincode,
-      profileImageUrl: updated.profile_image_url,
-      isArchived: updated.is_archived
-    },
-    error: null
-  });
 }
 
-export async function archiveContact(req, res) {
-  const { id } = req.params;
-  const contact = inMemoryStore.contacts.find(c => c.id === id);
+export async function createContact(req, res, next) {
+  const client = await pool.connect();
+  try {
+    const { name, type, email, mobile, city, state, pincode, profileImageUrl } = req.body;
 
-  if (!contact) {
-    return res.status(404).json({
-      success: false,
-      data: null,
-      error: {
-        code: 'NOT_FOUND',
-        message: `Contact with ID '${id}' not found`
+    if (!name || !type) {
+      return res.status(400).json({
+        success: false,
+        data: null,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Name and type (customer/vendor/both) are required fields',
+          field: !name ? 'name' : 'type'
+        }
+      });
+    }
+
+    await client.query('BEGIN');
+
+    let provisionedUserId = null;
+    if (email) {
+      const userRes = await client.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [email]);
+      if (userRes.rowCount === 0) {
+        const hash = bcrypt.hashSync('password123', 10);
+        const newUserRes = await client.query(
+          'INSERT INTO users (email, password_hash, role, is_active, created_at) VALUES ($1, $2, $3, true, NOW()) RETURNING id',
+          [email, hash, 'contact']
+        );
+        provisionedUserId = newUserRes.rows[0].id;
+      } else {
+        provisionedUserId = userRes.rows[0].id;
       }
+    }
+
+    const newContactRes = await client.query(
+      `INSERT INTO contacts (user_id, name, type, email, mobile, city, state, pincode, profile_image_url, is_archived, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, NOW()) RETURNING *`,
+      [provisionedUserId, name, type, email || null, mobile || null, city || null, state || null, pincode || null, profileImageUrl || null]
+    );
+
+    await client.query('COMMIT');
+
+    const c = newContactRes.rows[0];
+    return res.status(201).json({
+      success: true,
+      data: {
+        id: c.id,
+        userId: c.user_id,
+        name: c.name,
+        type: c.type,
+        email: c.email,
+        mobile: c.mobile,
+        city: c.city,
+        state: c.state,
+        pincode: c.pincode,
+        profileImageUrl: c.profile_image_url,
+        isArchived: c.is_archived,
+        autoProvisionedUser: Boolean(provisionedUserId),
+        createdAt: c.created_at
+      },
+      error: null
     });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    next(err);
+  } finally {
+    client.release();
   }
+}
 
-  contact.is_archived = !contact.is_archived;
+export async function updateContact(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { name, type, email, mobile, city, state, pincode, profileImageUrl } = req.body;
+    
+    // Check if exists
+    const existing = await pool.query('SELECT * FROM contacts WHERE id = $1', [id]);
+    if (existing.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: `Contact not found` }
+      });
+    }
 
-  return res.json({
-    success: true,
-    data: {
-      id: contact.id,
-      isArchived: contact.is_archived
-    },
-    error: null
-  });
+    const e = existing.rows[0];
+    
+    const updatedRes = await pool.query(
+      `UPDATE contacts SET
+         name = COALESCE($1, name),
+         type = COALESCE($2, type),
+         email = COALESCE($3, email),
+         mobile = COALESCE($4, mobile),
+         city = COALESCE($5, city),
+         state = COALESCE($6, state),
+         pincode = COALESCE($7, pincode),
+         profile_image_url = $8
+       WHERE id = $9 RETURNING *`,
+      [name, type, email, mobile, city, state, pincode, profileImageUrl !== undefined ? profileImageUrl : e.profile_image_url, id]
+    );
+
+    const c = updatedRes.rows[0];
+    return res.json({
+      success: true,
+      data: {
+        id: c.id,
+        name: c.name,
+        type: c.type,
+        email: c.email,
+        mobile: c.mobile,
+        city: c.city,
+        state: c.state,
+        pincode: c.pincode,
+        profileImageUrl: c.profile_image_url,
+        isArchived: c.is_archived
+      },
+      error: null
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function archiveContact(req, res, next) {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      'UPDATE contacts SET is_archived = NOT is_archived WHERE id = $1 RETURNING *',
+      [id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: `Contact not found` }
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        id: result.rows[0].id,
+        isArchived: result.rows[0].is_archived
+      },
+      error: null
+    });
+  } catch (err) {
+    next(err);
+  }
 }

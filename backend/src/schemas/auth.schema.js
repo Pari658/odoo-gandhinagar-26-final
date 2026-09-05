@@ -4,9 +4,11 @@ export const authSchema = {
   login: z.object({
     body: z.object({
       email: z.string().email('Invalid email address').optional(),
+      loginId: z.string().optional(),
+      username: z.string().optional(),
       password: z.string().min(1, 'Password is required')
-    }).refine(data => data.email || data.username, {
-      message: 'Either email, or username is required',
+    }).refine(data => data.email || data.username || data.loginId, {
+      message: 'Either email, loginId, or username is required',
     })
   }),
 

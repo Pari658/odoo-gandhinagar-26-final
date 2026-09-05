@@ -6,9 +6,11 @@ import AccountsModule from './components/AccountsModule.jsx';
 import JournalsModule from './components/JournalsModule.jsx';
 import TaxRatesModule from './components/TaxRatesModule.jsx';
 import AnalyticAccountsModule from './components/AnalyticAccountsModule.jsx';
+import PurchaseOrdersModule from './components/PurchaseOrdersModule.jsx';
+import VendorBillsModule from './components/VendorBillsModule.jsx';
 import AuthPage from './components/AuthPage.jsx';
 import { useAuth } from './context/AuthContext.jsx';
-import { Users, Package, BookOpen, BookMarked, Percent, PieChart, ShieldCheck } from 'lucide-react';
+import { Users, Package, BookOpen, BookMarked, Percent, PieChart, ShieldCheck, ShoppingCart, FileText } from 'lucide-react';
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('uf_theme') || 'light');
@@ -42,6 +44,8 @@ export default function App() {
     { id: 'journals', label: 'Journals Master', icon: BookMarked },
     { id: 'tax-rates', label: 'Tax Rates', icon: Percent },
     { id: 'analytic-accounts', label: 'Analytic Accounts', icon: PieChart },
+    { id: 'purchase-orders', label: 'Purchase Orders', icon: ShoppingCart },
+    { id: 'vendor-bills', label: 'Vendor Bills', icon: FileText },
   ];
 
   return (
@@ -58,10 +62,10 @@ export default function App() {
             </div>
             <div>
               <h2 className="font-heading font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6]">
-                Dev 1 Architect Engine Active
+                Dev 1 & Dev 2 Architect Engines Active
               </h2>
               <p className="text-xs text-[#6B5E55] dark:text-[#A89B91]">
-                Master Data Management, 2-Way JWT Auth & Supabase PostgreSQL Database Integration
+                Master Data Management, Payable Ops (Purchases & Unified Payments), 2-Way JWT Auth & Supabase PostgreSQL Database Integration
               </p>
             </div>
           </div>
@@ -103,6 +107,8 @@ export default function App() {
           {activeTab === 'journals' && <JournalsModule />}
           {activeTab === 'tax-rates' && <TaxRatesModule />}
           {activeTab === 'analytic-accounts' && <AnalyticAccountsModule />}
+          {activeTab === 'purchase-orders' && <PurchaseOrdersModule />}
+          {activeTab === 'vendor-bills' && <VendorBillsModule />}
         </div>
       </main>
     </div>

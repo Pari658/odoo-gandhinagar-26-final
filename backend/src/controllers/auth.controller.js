@@ -10,7 +10,7 @@ import {
  * Login Endpoint
  */
 export async function login(req, res) {
-  const loginInput = req.body.loginId || req.body.email || req.body.username;
+  const loginInput = req.body.email || req.body.username;
   const password = req.body.password;
 
   if (!loginInput || !password) {

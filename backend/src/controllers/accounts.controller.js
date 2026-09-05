@@ -1,26 +1,38 @@
-import { inMemoryStore } from '../db/index.js';
+import { pool } from '../config/supabase.js';
 
-export async function getAccounts(req, res) {
+export async function getAccounts(req, res, next) {
+  try {
   const { type, reportGroup } = req.query;
+    const params = [];
+    const filters = [];
 
-  let items = [...inMemoryStore.chart_of_accounts];
+    if (type) {
+      params.push(type);
+      filters.push(`type = $${params.length}`);
+    }
 
-  if (type) {
-    items = items.filter(a => a.type === type);
-  }
+    if (reportGroup) {
+      params.push(reportGroup);
+      filters.push(`report_group = $${params.length}`);
+    }
 
-  if (reportGroup) {
-    items = items.filter(a => a.report_group === reportGroup);
-  }
+    const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+    const result = await pool.query(
+      `SELECT id, name, type, report_group, is_archived, created_at
+       FROM chart_of_accounts
+       ${whereClause}
+       ORDER BY name`,
+      params
+    );
 
-  const formatted = items.map(a => ({
+    const formatted = result.rows.map(a => ({
     id: a.id,
     name: a.name,
     type: a.type,
     reportGroup: a.report_group,
     isArchived: Boolean(a.is_archived),
     createdAt: a.created_at
-  }));
+    }));
 
   const grouped = {
     asset: formatted.filter(a => a.type === 'asset'),
@@ -33,17 +45,21 @@ export async function getAccounts(req, res) {
     other_expense: formatted.filter(a => a.type === 'other_expense')
   };
 
-  return res.json({
-    success: true,
-    data: {
-      items: formatted,
-      grouped
-    },
-    error: null
-  });
+    return res.json({
+      success: true,
+      data: {
+        items: formatted,
+        grouped
+      },
+      error: null
+    });
+  } catch (err) {
+    next(err);
+  }
 }
 
-export async function createAccount(req, res) {
+export async function createAccount(req, res, next) {
+  try {
   const { name, type, reportGroup } = req.body;
 
   if (!name || !type) {
@@ -62,27 +78,27 @@ export async function createAccount(req, res) {
     ['asset', 'liability', 'bank', 'cash', 'capital'].includes(type) ? 'balance_sheet' : 'profit_and_loss'
   );
 
-  const newAccount = {
-    id: `acc-${Date.now().toString().slice(-4)}`,
-    name,
-    type,
-    report_group: derivedReportGroup,
-    is_archived: false,
-    created_at: new Date().toISOString()
-  };
+    const result = await pool.query(
+      `INSERT INTO chart_of_accounts (name, type, report_group, is_archived, created_at)
+       VALUES ($1, $2, $3, false, NOW())
+       RETURNING id, name, type, report_group, is_archived, created_at`,
+      [name, type, derivedReportGroup]
+    );
+    const newAccount = result.rows[0];
 
-  inMemoryStore.chart_of_accounts.push(newAccount);
-
-  return res.status(201).json({
-    success: true,
-    data: {
-      id: newAccount.id,
-      name: newAccount.name,
-      type: newAccount.type,
-      reportGroup: newAccount.report_group,
-      isArchived: false,
-      createdAt: newAccount.created_at
-    },
-    error: null
-  });
+    return res.status(201).json({
+      success: true,
+      data: {
+        id: newAccount.id,
+        name: newAccount.name,
+        type: newAccount.type,
+        reportGroup: newAccount.report_group,
+        isArchived: newAccount.is_archived,
+        createdAt: newAccount.created_at
+      },
+      error: null
+    });
+  } catch (err) {
+    next(err);
+  }
 }
