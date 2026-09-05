@@ -1,43 +1,49 @@
-import { query } from '../config/supabase.js';
-export async function getAccounts(req, res) {
-  const { type, reportGroup } = req.query;
+import { pool } from '../config/supabase.js';
 
+export async function getAccounts(req, res, next) {
   try {
-    let sql = 'SELECT id, name, type, report_group AS "reportGroup", is_archived AS "isArchived", created_at AS "createdAt" FROM chart_of_accounts WHERE is_archived = false';
+  const { type, reportGroup } = req.query;
     const params = [];
+    const filters = [];
 
     if (type) {
       params.push(type);
-      sql += ` AND type = $${params.length}`;
+      filters.push(`type = $${params.length}`);
     }
 
     if (reportGroup) {
       params.push(reportGroup);
-      sql += ` AND report_group = $${params.length}`;
+      filters.push(`report_group = $${params.length}`);
     }
 
-    sql += ' ORDER BY name ASC;';
+    const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+    const result = await pool.query(
+      `SELECT id, name, type, report_group, is_archived, created_at
+       FROM chart_of_accounts
+       ${whereClause}
+       ORDER BY name`,
+      params
+    );
 
-    const result = await query(sql, params);
     const formatted = result.rows.map(a => ({
-      id: a.id,
-      name: a.name,
-      type: a.type,
-      reportGroup: a.reportGroup,
-      isArchived: Boolean(a.isArchived),
-      createdAt: a.createdAt
+    id: a.id,
+    name: a.name,
+    type: a.type,
+    reportGroup: a.report_group,
+    isArchived: Boolean(a.is_archived),
+    createdAt: a.created_at
     }));
 
-    const grouped = {
-      asset: formatted.filter(a => a.type === 'asset'),
-      bank: formatted.filter(a => a.type === 'bank'),
-      cash: formatted.filter(a => a.type === 'cash'),
-      liability: formatted.filter(a => a.type === 'liability'),
-      capital: formatted.filter(a => a.type === 'capital'),
-      income: formatted.filter(a => a.type === 'income'),
-      expense: formatted.filter(a => a.type === 'expense'),
-      other_expense: formatted.filter(a => a.type === 'other_expense')
-    };
+  const grouped = {
+    asset: formatted.filter(a => a.type === 'asset'),
+    bank: formatted.filter(a => a.type === 'bank'),
+    cash: formatted.filter(a => a.type === 'cash'),
+    liability: formatted.filter(a => a.type === 'liability'),
+    capital: formatted.filter(a => a.type === 'capital'),
+    income: formatted.filter(a => a.type === 'income'),
+    expense: formatted.filter(a => a.type === 'expense'),
+    other_expense: formatted.filter(a => a.type === 'other_expense')
+  };
 
     return res.json({
       success: true,
@@ -48,19 +54,12 @@ export async function getAccounts(req, res) {
       error: null
     });
   } catch (err) {
-    console.error('Error querying chart_of_accounts from DB:', err.message);
-    return res.status(500).json({
-      success: false,
-      data: null,
-      error: {
-        code: 'DB_ERROR',
-        message: 'Failed to fetch accounts'
-      }
-    });
+    next(err);
   }
 }
 
-export async function createAccount(req, res) {
+export async function createAccount(req, res, next) {
+  try {
   const { name, type, reportGroup } = req.body;
 
   if (!name || !type) {
@@ -79,28 +78,27 @@ export async function createAccount(req, res) {
     ['asset', 'liability', 'bank', 'cash', 'capital'].includes(type) ? 'balance_sheet' : 'profit_and_loss'
   );
 
-  try {
-    const insertSql = `
-      INSERT INTO chart_of_accounts (name, type, report_group)
-      VALUES ($1, $2, $3)
-      RETURNING id, name, type, report_group AS "reportGroup", is_archived AS "isArchived", created_at AS "createdAt";
-    `;
-    const result = await query(insertSql, [name.trim(), type, derivedReportGroup]);
+    const result = await pool.query(
+      `INSERT INTO chart_of_accounts (name, type, report_group, is_archived, created_at)
+       VALUES ($1, $2, $3, false, NOW())
+       RETURNING id, name, type, report_group, is_archived, created_at`,
+      [name, type, derivedReportGroup]
+    );
+    const newAccount = result.rows[0];
 
     return res.status(201).json({
       success: true,
-      data: result.rows[0],
+      data: {
+        id: newAccount.id,
+        name: newAccount.name,
+        type: newAccount.type,
+        reportGroup: newAccount.report_group,
+        isArchived: newAccount.is_archived,
+        createdAt: newAccount.created_at
+      },
       error: null
     });
   } catch (err) {
-    console.error('Error creating account in DB:', err.message);
-    return res.status(500).json({
-      success: false,
-      data: null,
-      error: {
-        code: 'DB_ERROR',
-        message: 'Failed to create account'
-      }
-    });
+    next(err);
   }
 }

@@ -28,10 +28,10 @@ export function AuthProvider({ children }) {
   }, [user]);
 
   // Login
-  const login = async (loginInput, password) => {
+  const login = async (email, password) => {
     setLoading(true);
     try {
-      const data = await apiRequest('POST', '/auth/login', { loginId: loginInput, email: loginInput, password });
+      const data = await apiRequest('POST', '/auth/login', { email: email, password: password });
       setAccessToken(data.accessToken);
       setRefreshToken(data.refreshToken);
       setUser(data.user);
