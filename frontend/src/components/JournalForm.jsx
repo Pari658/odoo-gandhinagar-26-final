@@ -4,14 +4,12 @@ import { apiRequest } from '../api/client.js';
 export default function JournalForm({ initialData, onSave, onCancel }) {
   const [accounts, setAccounts] = useState([]);
   
-  const [formData, setFormData] = useState(
-    initialData || {
-      name: '',
-      type: 'sales',
-      defaultDebitAccountId: '',
-      defaultCreditAccountId: ''
-    }
-  );
+  const [formData, setFormData] = useState({
+    id: initialData?.id || undefined,
+    name: initialData?.name || '',
+    type: initialData?.type || 'sales',
+    defaultAccountId: initialData?.defaultDebitAccountId || initialData?.defaultCreditAccountId || ''
+  });
 
   useEffect(() => {
     fetchAccounts();
@@ -29,7 +27,11 @@ export default function JournalForm({ initialData, onSave, onCancel }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave(formData);
+    onSave({
+      ...formData,
+      defaultDebitAccountId: formData.defaultAccountId,
+      defaultCreditAccountId: formData.defaultAccountId
+    });
   };
 
   return (
@@ -80,29 +82,11 @@ export default function JournalForm({ initialData, onSave, onCancel }) {
 
         <div>
           <label className="block text-[#2C221E] dark:text-[#F5EFE6] font-semibold mb-1">
-            Default Debit Account
+            Default Account
           </label>
           <select
-            value={formData.defaultDebitAccountId}
-            onChange={e => setFormData({ ...formData, defaultDebitAccountId: e.target.value })}
-            className="w-full px-3 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6] focus:outline-none focus:border-[#B45309]"
-          >
-            <option value="">-- None (Optional) --</option>
-            {accounts.map(acc => (
-              <option key={acc.id} value={acc.id}>
-                {acc.name} ({acc.type})
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-[#2C221E] dark:text-[#F5EFE6] font-semibold mb-1">
-            Default Credit Account
-          </label>
-          <select
-            value={formData.defaultCreditAccountId}
-            onChange={e => setFormData({ ...formData, defaultCreditAccountId: e.target.value })}
+            value={formData.defaultAccountId}
+            onChange={e => setFormData({ ...formData, defaultAccountId: e.target.value })}
             className="w-full px-3 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6] focus:outline-none focus:border-[#B45309]"
           >
             <option value="">-- None (Optional) --</option>

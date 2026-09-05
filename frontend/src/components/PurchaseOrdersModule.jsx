@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import { ShoppingCart, Plus, Search, CheckCircle, XCircle, FileText, Check, AlertCircle, ArrowLeft, Trash2, Calendar, User, Package } from 'lucide-react';
+import { ShoppingCart, Plus, Search, FileText, CheckCircle, ArrowLeft, Trash2, XCircle, LayoutGrid, List, Send, FileCheck2, Calendar, User, Package } from 'lucide-react';
 
 export default function PurchaseOrdersModule() {
   const { user } = useAuth();
   
   const [view, setView] = useState('list'); // 'list' | 'detail'
+  const [displayMode, setDisplayMode] = useState('kanban'); // 'kanban' | 'table'
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [products, setProducts] = useState([]);
@@ -407,7 +408,7 @@ export default function PurchaseOrdersModule() {
           )}
 
           {/* Filter and Search Bar */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-3">
             <div className="relative w-full sm:max-w-md">
               <Search className="w-4 h-4 absolute left-3 top-2.5 text-[#9E9085]" />
               <input
@@ -418,64 +419,164 @@ export default function PurchaseOrdersModule() {
                 className="w-full pl-9 pr-4 py-2 text-xs rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-white dark:bg-[#1C1613] text-[#2C221E] dark:text-[#F5EFE6] focus:outline-none focus:ring-2 focus:ring-[#B45309]"
               />
             </div>
+            
+            {/* View Toggles */}
+            <div className="flex items-center bg-[#FAF6EE] dark:bg-[#29211D] rounded-lg border border-[#E6DFD5] dark:border-[#382D27] p-1 shrink-0">
+              <button
+                onClick={() => setDisplayMode('table')}
+                className={`p-1.5 rounded-md transition-colors cursor-pointer ${displayMode === 'table' ? 'bg-white dark:bg-[#1C1613] shadow-sm text-[#B45309]' : 'text-[#6B5E55] hover:text-[#2C221E] dark:hover:text-[#F5EFE6]'}`}
+                title="List View"
+              >
+                <List className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setDisplayMode('kanban')}
+                className={`p-1.5 rounded-md transition-colors cursor-pointer ${displayMode === 'kanban' ? 'bg-white dark:bg-[#1C1613] shadow-sm text-[#B45309]' : 'text-[#6B5E55] hover:text-[#2C221E] dark:hover:text-[#F5EFE6]'}`}
+                title="Kanban View"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
-          {/* POs Grid */}
+          {/* POs Display */}
           {loading ? (
             <div className="text-center py-12 text-xs text-[#6B5E55]">Loading Purchase Orders...</div>
+          ) : filteredPOs.length === 0 ? (
+            <div className="text-center py-12 text-xs text-[#6B5E55]">No purchase orders found.</div>
+          ) : displayMode === 'table' ? (
+            <div className="bg-white dark:bg-[#1C1613] rounded-2xl border border-[#E6DFD5] dark:border-[#382D27] overflow-hidden shadow-sm flex flex-col flex-1">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm whitespace-nowrap">
+                  <thead className="bg-[#FAF6EE] dark:bg-[#29211D] text-[#6B5E55] dark:text-[#A89B91]">
+                    <tr>
+                      <th className="px-6 py-4 font-semibold">Order Number</th>
+                      <th className="px-6 py-4 font-semibold">Vendor</th>
+                      <th className="px-6 py-4 font-semibold">Order Date</th>
+                      <th className="px-6 py-4 font-semibold text-right">Total Amount</th>
+                      <th className="px-6 py-4 font-semibold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E6DFD5] dark:divide-[#382D27]">
+                    {filteredPOs.map((po) => (
+                      <tr 
+                        key={po.id} 
+                        onClick={() => openDetail(po.id)}
+                        className="group hover:bg-[#FAF6EE]/50 dark:hover:bg-[#29211D]/50 transition-colors cursor-pointer"
+                      >
+                        <td className="px-6 py-4">
+                          <span className="font-bold text-[#2C221E] dark:text-[#F5EFE6]">{po.number || 'Draft'}</span>
+                        </td>
+                        <td className="px-6 py-4 text-[#6B5E55] dark:text-[#A89B91]">
+                          {po.vendorName}
+                        </td>
+                        <td className="px-6 py-4 text-[#6B5E55] dark:text-[#A89B91]">
+                          {new Date(po.orderDate).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 text-right font-mono font-bold text-[#2C221E] dark:text-[#F5EFE6]">
+                          ₹{Number(po.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border uppercase ${
+                            po.status === 'draft' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+                            po.status === 'confirmed' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+                            po.status === 'done' ? 'bg-purple-50 text-purple-800 border-purple-200' :
+                            'bg-red-50 text-red-800 border-red-200'
+                          }`}>
+                            {po.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredPOs.map(po => (
-                <div 
-                  key={po.id} 
-                  onClick={() => openDetail(po.id)}
-                  className="p-4 rounded-xl bg-white dark:bg-[#1C1613] border border-[#E6DFD5] dark:border-[#382D27] shadow-sm hover:shadow-md hover:border-[#B45309]/50 transition-all cursor-pointer space-y-4 group"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[#FAF6EE] dark:bg-[#29211D] border border-[#E6DFD5] dark:border-[#382D27] flex items-center justify-center text-[#B45309] group-hover:bg-[#B45309] group-hover:text-white transition-all">
-                        <ShoppingCart className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h3 className="font-heading font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6] group-hover:text-[#B45309] transition-colors">{po.number || 'Draft'}</h3>
-                        <span className="text-[10px] font-mono text-[#6B5E55]">{po.vendorName}</span>
-                      </div>
-                    </div>
-
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border uppercase ${
-                      po.status === 'draft' ? 'bg-amber-50 text-amber-800 border-amber-200' :
-                      po.status === 'confirmed' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-                      po.status === 'done' ? 'bg-purple-50 text-purple-800 border-purple-200' :
-                      'bg-red-50 text-red-800 border-red-200'
-                    }`}>
-                      {po.status}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-xs text-[#6B5E55] dark:text-[#A89B91] border-t border-b border-[#E6DFD5]/40 dark:border-[#382D27] py-2">
-                    <div>
-                      <p className="font-medium text-[10px]">Total Amount</p>
-                      <p className="font-mono tabular-nums text-[#2C221E] dark:text-[#F5EFE6] font-bold">
-                        ₹{Number(po.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="font-medium text-[10px]">Order Date</p>
-                      <p className="font-medium text-[#2C221E] dark:text-[#F5EFE6]">{new Date(po.orderDate).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs pt-1">
-                    <span className="text-[#6B5E55]">View Full Details</span>
-                    <span className="font-bold text-[#B45309]">→</span>
-                  </div>
+            <div className="flex gap-4 overflow-x-auto pb-4 flex-1 items-start min-h-[500px]">
+              {/* Draft Column */}
+              <div className="w-80 shrink-0 bg-[#FAF6EE]/50 dark:bg-[#1C1613]/50 rounded-2xl border border-[#E6DFD5] dark:border-[#382D27] flex flex-col h-full max-h-full">
+                <div className="p-4 border-b border-[#E6DFD5]/50 dark:border-[#382D27] flex items-center justify-between sticky top-0 bg-[#FAF6EE]/90 dark:bg-[#1C1613]/90 backdrop-blur-sm rounded-t-2xl z-10">
+                  <h3 className="font-heading font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6] flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-amber-600" />
+                    Request for Quotation
+                  </h3>
+                  <span className="text-[10px] font-bold bg-[#E6DFD5] dark:bg-[#382D27] text-[#6B5E55] px-2 py-0.5 rounded-full">
+                    {filteredPOs.filter(po => po.status === 'draft').length}
+                  </span>
                 </div>
-              ))}
-              {filteredPOs.length === 0 && !loading && (
-                <div className="col-span-full py-8 text-center text-sm text-[#6B5E55]">
-                  No purchase orders found.
+                <div className="p-3 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
+                  {filteredPOs.filter(po => po.status === 'draft').map(po => (
+                    <div key={po.id} onClick={() => openDetail(po.id)} className="bg-white dark:bg-[#29211D] p-4 rounded-xl border border-[#E6DFD5] dark:border-[#382D27] shadow-sm hover:shadow-md hover:border-amber-300 transition-all cursor-pointer group">
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6] group-hover:text-amber-600 transition-colors">{po.number || 'Draft PO'}</span>
+                        <span className="font-mono font-bold text-[#2C221E] dark:text-[#F5EFE6] text-xs">₹{Number(po.total).toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="text-xs text-[#6B5E55] dark:text-[#A89B91] mb-3 line-clamp-1">{po.vendorName}</div>
+                      <div className="flex items-center justify-between border-t border-[#E6DFD5]/60 dark:border-[#382D27] pt-2">
+                        <span className="text-[10px] font-mono text-[#A89B91]">{new Date(po.orderDate).toLocaleDateString()}</span>
+                        <span className="text-[10px] font-bold text-amber-600">Draft</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )}
+              </div>
+
+              {/* Confirmed Column */}
+              <div className="w-80 shrink-0 bg-[#FAF6EE]/50 dark:bg-[#1C1613]/50 rounded-2xl border border-[#E6DFD5] dark:border-[#382D27] flex flex-col h-full max-h-full">
+                <div className="p-4 border-b border-[#E6DFD5]/50 dark:border-[#382D27] flex items-center justify-between sticky top-0 bg-[#FAF6EE]/90 dark:bg-[#1C1613]/90 backdrop-blur-sm rounded-t-2xl z-10">
+                  <h3 className="font-heading font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6] flex items-center gap-2">
+                    <Send className="w-4 h-4 text-emerald-600" />
+                    Purchase Order
+                  </h3>
+                  <span className="text-[10px] font-bold bg-[#E6DFD5] dark:bg-[#382D27] text-[#6B5E55] px-2 py-0.5 rounded-full">
+                    {filteredPOs.filter(po => po.status === 'confirmed').length}
+                  </span>
+                </div>
+                <div className="p-3 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
+                  {filteredPOs.filter(po => po.status === 'confirmed').map(po => (
+                    <div key={po.id} onClick={() => openDetail(po.id)} className="bg-white dark:bg-[#29211D] p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/50 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all cursor-pointer group">
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6] group-hover:text-emerald-600 transition-colors">{po.number}</span>
+                        <span className="font-mono font-bold text-[#2C221E] dark:text-[#F5EFE6] text-xs">₹{Number(po.total).toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="text-xs text-[#6B5E55] dark:text-[#A89B91] mb-3 line-clamp-1">{po.vendorName}</div>
+                      <div className="flex items-center justify-between border-t border-[#E6DFD5]/60 dark:border-[#382D27] pt-2">
+                        <span className="text-[10px] font-mono text-[#A89B91]">{new Date(po.orderDate).toLocaleDateString()}</span>
+                        <span className="text-[10px] font-bold text-emerald-600">Confirmed</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Done / Billed Column */}
+              <div className="w-80 shrink-0 bg-[#FAF6EE]/50 dark:bg-[#1C1613]/50 rounded-2xl border border-[#E6DFD5] dark:border-[#382D27] flex flex-col h-full max-h-full">
+                <div className="p-4 border-b border-[#E6DFD5]/50 dark:border-[#382D27] flex items-center justify-between sticky top-0 bg-[#FAF6EE]/90 dark:bg-[#1C1613]/90 backdrop-blur-sm rounded-t-2xl z-10">
+                  <h3 className="font-heading font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6] flex items-center gap-2">
+                    <FileCheck2 className="w-4 h-4 text-purple-600" />
+                    Locked / Done
+                  </h3>
+                  <span className="text-[10px] font-bold bg-[#E6DFD5] dark:bg-[#382D27] text-[#6B5E55] px-2 py-0.5 rounded-full">
+                    {filteredPOs.filter(po => po.status === 'done').length}
+                  </span>
+                </div>
+                <div className="p-3 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
+                  {filteredPOs.filter(po => po.status === 'done').map(po => (
+                    <div key={po.id} onClick={() => openDetail(po.id)} className="bg-white dark:bg-[#29211D] p-4 rounded-xl border border-purple-200 dark:border-purple-900/50 shadow-sm hover:shadow-md hover:border-purple-300 transition-all cursor-pointer group">
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6] group-hover:text-purple-600 transition-colors">{po.number}</span>
+                        <span className="font-mono font-bold text-[#2C221E] dark:text-[#F5EFE6] text-xs">₹{Number(po.total).toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="text-xs text-[#6B5E55] dark:text-[#A89B91] mb-3 line-clamp-1">{po.vendorName}</div>
+                      <div className="flex items-center justify-between border-t border-[#E6DFD5]/60 dark:border-[#382D27] pt-2">
+                        <span className="text-[10px] font-mono text-[#A89B91]">{new Date(po.orderDate).toLocaleDateString()}</span>
+                        <span className="text-[10px] font-bold text-purple-600 flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Done</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>
