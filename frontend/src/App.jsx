@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Navbar from './components/Navbar.jsx';
+import Sidebar from './components/Sidebar.jsx';
 import ContactsModule from './components/ContactsModule.jsx';
 import ProductsModule from './components/ProductsModule.jsx';
 import AccountsModule from './components/AccountsModule.jsx';
@@ -25,6 +25,8 @@ import {
   Scale, 
   LayoutDashboard,
   ShoppingCart,
+  Sun,
+  Moon,
   FileText
 } from 'lucide-react';
 
@@ -68,7 +70,7 @@ export default function App() {
 
   const allTabs = [
     ...(isStaff ? [
-      { id: 'dashboard', label: 'Admin Dashboard', icon: LayoutDashboard },
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { id: 'reports', label: 'Reports & Statements', icon: Scale }
     ] : []),
     { id: 'sales-orders', label: 'Sales Orders', icon: ShoppingCart },
@@ -83,55 +85,34 @@ export default function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#FAF6EE] dark:bg-[#120E0C] text-[#2C221E] dark:text-[#F5EFE6] transition-colors duration-200">
-      <Navbar theme={theme} toggleTheme={toggleTheme} activeTab={activeTab} setActiveTab={setActiveTab} />
+    <div className="min-h-screen bg-[#FAF6EE] dark:bg-[#120E0C] text-[#2C221E] dark:text-[#F5EFE6] transition-colors duration-200 flex flex-col md:flex-row">
+      <Sidebar theme={theme} toggleTheme={toggleTheme} activeTab={activeTab} setActiveTab={setActiveTab} allTabs={allTabs} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <main className="flex-1 w-full max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 space-y-6 md:h-screen overflow-y-auto">
         
-        {/* Module Status Header */}
-        <div className="p-4 rounded-xl border border-[#E6DFD5] dark:border-[#382D27] bg-white dark:bg-[#1C1613] shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-[#B45309] text-white">
-              <ShieldCheck className="w-5 h-5" />
+        {/* Top Action Bar */}
+        <div className="flex items-center justify-end">
+          <button
+            onClick={toggleTheme}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#E6DFD5] dark:border-[#382D27] bg-white dark:bg-[#1C1613] text-xs font-semibold text-[#2C221E] dark:text-[#F5EFE6] hover:bg-[#FAF6EE] dark:hover:bg-[#29211D] transition-all cursor-pointer shadow-sm"
+          >
+            {theme === 'dark' ? (
+              <>
+                <Sun className="w-3.5 h-3.5 text-amber-400" />
+                <span>Light</span>
+              </>
+            ) : (
+              <>
+                <Moon className="w-3.5 h-3.5 text-[#786C62]" />
+                <span>Dark</span>
+              </>
+            )}
+          </button>
             </div>
-            <div>
-              <h2 className="font-heading font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6]">
-                Dev 1 & Dev 2 Architect Engines Active
-              </h2>
-              <p className="text-xs text-[#6B5E55] dark:text-[#A89B91]">
-                Master Data Management, Payable Ops (Purchases & Unified Payments), 2-Way JWT Auth & Supabase PostgreSQL Database Integration
-              </p>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-2 text-xs font-semibold">
-            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800">
-              ● Supabase DB Connected
-            </span>
-          </div>
-        </div>
 
-        {/* Tab Navigation Controls */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-[#E6DFD5] dark:border-[#382D27]">
-          {allTabs.map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-[#B45309] text-white shadow-sm'
-                    : 'bg-white dark:bg-[#1C1613] text-[#6B5E55] dark:text-[#A89B91] hover:text-[#2C221E] dark:hover:text-white border border-[#E6DFD5] dark:border-[#382D27]'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
+
+
 
         {/* Active Module Panel */}
         <div className="pt-2">

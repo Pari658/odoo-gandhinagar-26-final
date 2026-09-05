@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import { FileText, Plus, Search, CheckCircle, XCircle, DollarSign, Check, AlertCircle } from 'lucide-react';
+import { FileText, Plus, Search, CheckCircle, XCircle, DollarSign, Check, AlertCircle, ArrowLeft, Trash2, Calendar, User, ShoppingBag, Layers, AlertTriangle } from 'lucide-react';
 import PaymentModal from './PaymentModal.jsx';
 
 export default function VendorBillsModule() {
@@ -10,12 +10,18 @@ export default function VendorBillsModule() {
   const [vendors, setVendors] = useState([]);
   const [products, setProducts] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [analyticAccounts, setAnalyticAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   
+  const [view, setView] = useState('list'); // 'list' | 'detail'
+  const [selectedBillId, setSelectedBillId] = useState(null);
+  const [billDetail, setBillDetail] = useState(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [selectedBill, setSelectedBill] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   
   const [message, setMessage] = useState(null);
 
@@ -41,6 +47,7 @@ export default function VendorBillsModule() {
     fetchVendors();
     fetchProducts();
     fetchAccounts();
+    fetchAnalyticAccounts();
   }, []);
 
   const fetchVendorBills = async () => {
@@ -82,10 +89,37 @@ export default function VendorBillsModule() {
     }
   };
 
+  const fetchAnalyticAccounts = async () => {
+    try {
+      const data = await apiRequest('GET', '/analytic-accounts');
+      setAnalyticAccounts(data || []);
+    } catch (err) {
+      console.error('Failed to load analytic accounts:', err);
+    }
+  };
+
+  const loadBillDetail = async (id) => {
+    setLoadingDetail(true);
+    try {
+      const res = await apiRequest('GET', `/vendor-bills/${id}`);
+      setBillDetail(res);
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'Failed to load bill details' });
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  const openDetail = (id) => {
+    setSelectedBillId(id);
+    setView('detail');
+    loadBillDetail(id);
+  };
+
   const handleAddLine = () => {
     setFormData({
       ...formData,
-      lines: [...formData.lines, { productId: '', accountId: '', quantity: 1, unitPrice: 0 }]
+      lines: [...formData.lines, { productId: '', accountId: '', analyticAccountId: '', quantity: 1, unitPrice: 0 }]
     });
   };
 
@@ -101,7 +135,7 @@ export default function VendorBillsModule() {
       newLines[index] = {
         ...newLines[index],
         productId: value,
-        accountId: product?.expenseAccountId || '',
+        accountId: product?.expenseAccountId || accounts[0]?.id || '',
         unitPrice: product ? product.costPrice : 0
       };
     } else {
@@ -137,6 +171,7 @@ export default function VendorBillsModule() {
         lines: []
       });
       fetchVendorBills();
+      openDetail(created.id);
     } catch (err) {
       setMessage({ type: 'error', text: err.message });
     }
@@ -147,48 +182,332 @@ export default function VendorBillsModule() {
       await apiRequest('POST', `/vendor-bills/${id}/confirm`);
       setMessage({ type: 'success', text: 'Vendor Bill confirmed and posted to ledger!' });
       fetchVendorBills();
+      if (view === 'detail' && selectedBillId === id) {
+        loadBillDetail(id);
+      }
     } catch (err) {
       setMessage({ type: 'error', text: err.message });
+    }
+  };
+
+  const handleDeleteBill = async () => {
+    if (!selectedBillId) return;
+    try {
+      await apiRequest('DELETE', `/vendor-bills/${selectedBillId}`);
+      setMessage({ type: 'success', text: 'Vendor bill deleted successfully!' });
+      setShowDeleteModal(false);
+      setView('list');
+      setSelectedBillId(null);
+      setBillDetail(null);
+      fetchVendorBills();
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message });
+      setShowDeleteModal(false);
     }
   };
 
   const openPaymentModal = (bill) => {
-    setSelectedBill(bill);
-    setPaymentData({
-      amount: Number(bill.amountDue).toFixed(2),
-      method: 'bank',
-      paymentDate: new Date().toISOString().split('T')[0],
-      note: `Payment for ${bill.billNumber}`
-    });
+    if (bill && bill.id) {
+      setSelectedBillId(bill.id);
+    }
     setShowPaymentModal(true);
   };
 
-  const handleRegisterPayment = async (e) => {
-    e.preventDefault();
-    try {
-      await apiRequest('POST', '/payments', {
-        direction: 'outbound',
-        vendorBillId: selectedBill.id,
-        partnerId: selectedBill.vendorId,
-        amount: Number(paymentData.amount),
-        method: paymentData.method,
-        paymentDate: paymentData.paymentDate,
-        note: paymentData.note
-      });
-      setMessage({ type: 'success', text: 'Payment registered successfully!' });
-      setShowPaymentModal(false);
-      fetchVendorBills();
-    } catch (err) {
-      setMessage({ type: 'error', text: err.message });
-    }
-  };
-
   const filteredBills = vendorBills.filter(bill => 
-    bill.billNumber?.toLowerCase().includes(search.toLowerCase()) ||
+    bill.number?.toLowerCase().includes(search.toLowerCase()) ||
     bill.vendorName?.toLowerCase().includes(search.toLowerCase()) ||
-    bill.purchaseOrderNumber?.toLowerCase().includes(search.toLowerCase())
+    bill.billReference?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const currentBillForPayment = (billDetail && selectedBillId && billDetail.id === selectedBillId)
+    ? billDetail
+    : vendorBills.find(b => b.id === selectedBillId);
+
+  const billDocument = currentBillForPayment ? {
+    id: currentBillForPayment.id,
+    vendorId: currentBillForPayment.vendorId,
+    vendorName: currentBillForPayment.vendorName,
+    billNumber: currentBillForPayment.number || currentBillForPayment.billNumber || 'Bill',
+    amountDue: currentBillForPayment.amountDue !== undefined
+      ? currentBillForPayment.amountDue
+      : (Number(currentBillForPayment.totalAmount || 0) - Number(currentBillForPayment.amountPaid || 0)),
+    totalAmount: currentBillForPayment.totalAmount,
+    amountPaid: currentBillForPayment.amountPaid
+  } : null;
+
+  // VENDOR BILL BIG VIEW (DETAIL VIEW)
+  if (view === 'detail') {
+    return (
+      <div className="space-y-6">
+        {/* Navigation Breadcrumb / Top Bar */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[#E6DFD5] dark:border-[#382D27] pb-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => { setView('list'); setSelectedBillId(null); setBillDetail(null); }}
+              className="p-2 rounded-xl bg-white dark:bg-[#1C1613] border border-[#E6DFD5] dark:border-[#382D27] text-[#6B5E55] dark:text-[#A89B91] hover:text-[#B45309] hover:border-[#B45309]/50 transition-all cursor-pointer shadow-xs"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-[#6B5E55] dark:text-[#A89B91]">Vendor Bills</span>
+                <span className="text-xs text-[#6B5E55]">/</span>
+                <span className="text-xs font-bold text-[#B45309]">{billDetail?.number || 'Bill View'}</span>
+              </div>
+              <h2 className="font-heading font-bold text-2xl text-[#2C221E] dark:text-[#F5EFE6] flex items-center gap-3">
+                <span>{billDetail?.number || 'Loading Bill...'}</span>
+                {billDetail && (
+                  <span className={`text-xs font-semibold px-3 py-1 rounded-full border uppercase ${
+                    billDetail.status === 'paid'
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300'
+                      : billDetail.status === 'partially_paid'
+                      ? 'bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300'
+                      : billDetail.status === 'unpaid'
+                      ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300'
+                      : 'bg-slate-100 text-slate-700 border-slate-200'
+                  }`}>
+                    {billDetail.status?.replace('_', ' ')}
+                  </span>
+                )}
+              </h2>
+            </div>
+          </div>
+
+          {['admin', 'accountant'].includes(user?.role) && billDetail && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {(!billDetail.journalEntryId && billDetail.status !== 'paid') && (
+                <button
+                  onClick={() => handleConfirm(billDetail.id)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Confirm Bill</span>
+                </button>
+              )}
+
+              {billDetail.amountDue > 0 && (
+                <button
+                  onClick={() => openPaymentModal(billDetail)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#B45309] hover:bg-[#92400E] text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
+                >
+                  <DollarSign className="w-4 h-4" />
+                  <span>Register Payment</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold hover:bg-red-100 transition-all cursor-pointer shadow-xs"
+              >
+                <Trash2 className="w-4 h-4 text-red-600" />
+                <span>Delete</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {message && (
+          <div className={`p-3 rounded-lg text-xs font-medium border flex items-center justify-between ${
+            message.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-800 border-red-200'
+          }`}>
+            <span>{message.text}</span>
+            <button onClick={() => setMessage(null)} className="font-bold cursor-pointer">✕</button>
+          </div>
+        )}
+
+        {loadingDetail || !billDetail ? (
+          <div className="text-center py-16 text-xs text-[#6B5E55]">Loading vendor bill details...</div>
+        ) : (
+          <div className="space-y-6">
+            
+            {/* Big View Summary Metrics Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="p-4 rounded-2xl bg-white dark:bg-[#1C1613] border border-[#E6DFD5] dark:border-[#382D27] shadow-sm">
+                <span className="text-[11px] text-[#6B5E55] dark:text-[#A89B91] block mb-1">Vendor Partner</span>
+                <div className="font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6] flex items-center gap-2">
+                  <User className="w-4 h-4 text-[#B45309]" />
+                  <span>{billDetail.vendorName || 'Vendor Partner'}</span>
+                </div>
+                {billDetail.vendorEmail && <span className="text-[10px] text-[#6B5E55] font-mono block mt-0.5">{billDetail.vendorEmail}</span>}
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white dark:bg-[#1C1613] border border-[#E6DFD5] dark:border-[#382D27] shadow-sm">
+                <span className="text-[11px] text-[#6B5E55] dark:text-[#A89B91] block mb-1">Bill Reference & PO</span>
+                <div className="font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6] flex items-center gap-2">
+                  <ShoppingBag className="w-4 h-4 text-[#B45309]" />
+                  <span>{billDetail.billReference || billDetail.purchaseOrderNumber || 'N/A'}</span>
+                </div>
+                <span className="text-[10px] text-[#6B5E55] block mt-0.5">Ref / Purchase Order</span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white dark:bg-[#1C1613] border border-[#E6DFD5] dark:border-[#382D27] shadow-sm">
+                <span className="text-[11px] text-[#6B5E55] dark:text-[#A89B91] block mb-1">Total Bill Amount</span>
+                <div className="font-mono font-bold text-lg text-[#2C221E] dark:text-[#F5EFE6]">
+                  ₹{Number(billDetail.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </div>
+                <span className="text-[10px] text-emerald-600 block mt-0.5">Paid: ₹{Number(billDetail.amountPaid).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white dark:bg-[#1C1613] border border-[#E6DFD5] dark:border-[#382D27] shadow-sm">
+                <span className="text-[11px] text-[#6B5E55] dark:text-[#A89B91] block mb-1">Balance Due</span>
+                <div className="font-mono font-bold text-lg text-[#B45309]">
+                  ₹{Number(billDetail.amountDue).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </div>
+                <span className="text-[10px] text-[#6B5E55] block mt-0.5">Due: {new Date(billDetail.dueDate).toLocaleDateString()}</span>
+              </div>
+            </div>
+
+            {/* Main Bill Card & Line Items Table */}
+            <div className="bg-white dark:bg-[#1C1613] rounded-2xl border border-[#E6DFD5] dark:border-[#382D27] p-6 shadow-sm space-y-6">
+              
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[#E6DFD5]/60 dark:border-[#382D27] pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-2xl bg-[#FAF6EE] dark:bg-[#29211D] text-[#B45309]">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-heading font-bold text-base text-[#2C221E] dark:text-[#F5EFE6]">
+                      Invoice Line Breakdown
+                    </h3>
+                    <p className="text-xs text-[#6B5E55] dark:text-[#A89B91]">
+                      Detailed cost items, expense chart of accounts & quantity totals
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-right text-xs">
+                  <span className="text-[#6B5E55] block">Invoice Date: <strong className="text-[#2C221E] dark:text-[#F5EFE6]">{new Date(billDetail.invoiceDate).toLocaleDateString()}</strong></span>
+                  <span className="text-[#6B5E55] block">Payment Term Due: <strong className="text-[#B45309]">{new Date(billDetail.dueDate).toLocaleDateString()}</strong></span>
+                </div>
+              </div>
+
+              {/* Line Items Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs whitespace-nowrap">
+                  <thead className="bg-[#FAF6EE] dark:bg-[#29211D] text-[#6B5E55] dark:text-[#A89B91]">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold rounded-l-lg">#</th>
+                      <th className="px-4 py-3 font-semibold">Product / Item</th>
+                      <th className="px-4 py-3 font-semibold">Chart Account</th>
+                      <th className="px-4 py-3 font-semibold">Analytic Account</th>
+                      <th className="px-4 py-3 font-semibold text-right">Quantity</th>
+                      <th className="px-4 py-3 font-semibold text-right">Unit Price</th>
+                      <th className="px-4 py-3 font-semibold text-right rounded-r-lg">Total Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E6DFD5] dark:divide-[#382D27]">
+                    {billDetail.lines && billDetail.lines.length > 0 ? (
+                      billDetail.lines.map((line, idx) => (
+                        <tr key={line.id || idx} className="hover:bg-[#FAF6EE]/50 dark:hover:bg-[#29211D]/40">
+                          <td className="px-4 py-3 font-mono text-[#6B5E55]">{idx + 1}</td>
+                          <td className="px-4 py-3 font-bold text-[#2C221E] dark:text-[#F5EFE6]">{line.productName}</td>
+                          <td className="px-4 py-3 text-[#6B5E55]">{line.accountName}</td>
+                          <td className="px-4 py-3 text-[#6B5E55]">
+                            {line.analyticAccountName ? (
+                              <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-medium">
+                                {line.analyticAccountName}
+                              </span>
+                            ) : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono">{line.quantity}</td>
+                          <td className="px-4 py-3 text-right font-mono">₹{Number(line.unitPrice).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right font-mono font-bold text-[#2C221E] dark:text-[#F5EFE6]">
+                            ₹{Number(line.total).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="text-center py-6 text-[#6B5E55]">No itemized lines recorded on this bill.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Total Summary Footer */}
+              <div className="pt-4 border-t border-[#E6DFD5]/60 dark:border-[#382D27] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="text-xs text-[#6B5E55] space-y-1">
+                  <div>Journal Entry ID: <strong className="font-mono text-[#2C221E] dark:text-[#F5EFE6]">{billDetail.journalEntryId || 'Unposted (Draft)'}</strong></div>
+                  <div>Created Timestamp: <span>{new Date(billDetail.createdAt).toLocaleString()}</span></div>
+                </div>
+
+                <div className="w-full sm:w-64 space-y-2 text-xs bg-[#FAF6EE] dark:bg-[#29211D] p-4 rounded-xl border border-[#E6DFD5] dark:border-[#382D27]">
+                  <div className="flex justify-between text-[#6B5E55]">
+                    <span>Subtotal:</span>
+                    <span className="font-mono font-semibold text-[#2C221E] dark:text-[#F5EFE6]">₹{Number(billDetail.totalAmount).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-emerald-600">
+                    <span>Amount Paid:</span>
+                    <span className="font-mono font-semibold">₹{Number(billDetail.amountPaid).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-bold text-[#B45309] pt-2 border-t border-[#E6DFD5] dark:border-[#382D27]">
+                    <span>Amount Due:</span>
+                    <span className="font-mono">₹{Number(billDetail.amountDue).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        )}
+
+        {/* PAYMENT MODAL */}
+        {showPaymentModal && billDocument && (
+          <PaymentModal
+            document={billDocument}
+            type="outbound"
+            onClose={() => setShowPaymentModal(false)}
+            onSuccess={() => {
+              setMessage({ type: 'success', text: 'Payment registered, confirmed and posted to ledger!' });
+              setShowPaymentModal(false);
+              fetchVendorBills();
+              if (selectedBillId) {
+                loadBillDetail(selectedBillId);
+              }
+            }}
+          />
+        )}
+
+        {/* DELETE CONFIRMATION MODAL */}
+        {showDeleteModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+            <div className="bg-white dark:bg-[#1C1613] rounded-2xl border border-[#E6DFD5] dark:border-[#382D27] p-6 max-w-md w-full shadow-xl space-y-4">
+              <div className="flex items-center gap-3 text-red-600">
+                <AlertTriangle className="w-6 h-6" />
+                <h3 className="font-heading font-bold text-lg text-[#2C221E] dark:text-[#F5EFE6]">
+                  Delete Vendor Bill?
+                </h3>
+              </div>
+              <p className="text-xs text-[#6B5E55] dark:text-[#A89B91]">
+                Are you sure you want to delete bill <strong>{billDetail?.number}</strong>? This action will permanently remove it from Supabase.
+              </p>
+              <div className="pt-2 flex items-center justify-end gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteModal(false)}
+                  className="px-4 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] text-slate-700 dark:text-slate-300 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteBill}
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold cursor-pointer"
+                >
+                  Delete Permanently
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+    );
+  }
+
+  // LIST VIEW
   return (
     <div className="space-y-6">
       {/* Top Action Header */}
@@ -198,7 +517,7 @@ export default function VendorBillsModule() {
             Vendor Bills
           </h2>
           <p className="text-xs text-[#6B5E55] dark:text-[#A89B91]">
-            Manage vendor invoices and register outgoing payments
+            Manage vendor invoices and register outgoing payments (Click any bill for full details)
           </p>
         </div>
 
@@ -228,7 +547,7 @@ export default function VendorBillsModule() {
           <Search className="w-4 h-4 absolute left-3 top-2.5 text-[#9E9085]" />
           <input
             type="text"
-            placeholder="Search by Bill #, Vendor, or PO..."
+            placeholder="Search by Bill #, Vendor, or Ref..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2 text-xs rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-white dark:bg-[#1C1613] text-[#2C221E] dark:text-[#F5EFE6] focus:outline-none focus:ring-2 focus:ring-[#B45309]"
@@ -242,122 +561,95 @@ export default function VendorBillsModule() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredBills.map(bill => (
-            <div key={bill.id} className="p-4 rounded-xl bg-white dark:bg-[#1C1613] border border-[#E6DFD5] dark:border-[#382D27] shadow-sm hover:shadow-md transition-shadow space-y-4">
+            <div
+              key={bill.id}
+              onClick={() => openDetail(bill.id)}
+              className="p-4 rounded-xl bg-white dark:bg-[#1C1613] border border-[#E6DFD5] dark:border-[#382D27] shadow-sm hover:shadow-md hover:border-[#B45309]/50 transition-all cursor-pointer space-y-4 group"
+            >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#FAF6EE] dark:bg-[#29211D] border border-[#E6DFD5] dark:border-[#382D27] flex items-center justify-center text-[#B45309]">
+                  <div className="w-10 h-10 rounded-full bg-[#FAF6EE] dark:bg-[#29211D] border border-[#E6DFD5] dark:border-[#382D27] flex items-center justify-center text-[#B45309] group-hover:bg-[#B45309] group-hover:text-white transition-all">
                     <FileText className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-heading font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6]">{bill.billNumber || 'Draft'}</h3>
-                    <span className="text-[10px] font-mono text-[#6B5E55]">{bill.vendorName}</span>
+                    <h3 className="font-heading font-bold text-sm text-[#2C221E] dark:text-[#F5EFE6] group-hover:text-[#B45309] transition-colors">
+                      {bill.number || bill.billNumber}
+                    </h3>
+                    <p className="text-xs text-[#6B5E55] dark:text-[#A89B91]">
+                      {bill.vendorName}
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-1 items-end">
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border uppercase ${
-                    bill.state === 'draft' ? 'bg-amber-50 text-amber-800 border-amber-200' :
-                    bill.state === 'posted' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-                    'bg-red-50 text-red-800 border-red-200'
-                  }`}>
-                    {bill.state}
-                  </span>
-                  {bill.state === 'posted' && (
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border uppercase ${
-                      bill.paymentStatus === 'paid' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-                      bill.paymentStatus === 'partial' ? 'bg-blue-50 text-blue-800 border-blue-200' :
-                      'bg-gray-50 text-gray-800 border-gray-200'
-                    }`}>
-                      {bill.paymentStatus}
-                    </span>
-                  )}
+                <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border uppercase ${
+                  bill.status === 'paid'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : bill.status === 'partially_paid'
+                    ? 'bg-blue-50 text-blue-800 border-blue-200'
+                    : bill.status === 'unpaid'
+                    ? 'bg-amber-50 text-amber-800 border-amber-200'
+                    : 'bg-slate-100 text-slate-700 border-slate-200'
+                }`}>
+                  {bill.status?.replace('_', ' ')}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs border-t border-b border-[#E6DFD5]/40 dark:border-[#382D27] py-2">
+                <div>
+                  <span className="text-[#6B5E55] block text-[10px]">Total Amount</span>
+                  <span className="font-bold text-[#2C221E] dark:text-[#F5EFE6]">₹{Number(bill.totalAmount).toLocaleString('en-IN')}</span>
+                </div>
+                <div>
+                  <span className="text-[#6B5E55] block text-[10px]">Due Date</span>
+                  <span className="font-medium text-[#6B5E55]">{new Date(bill.dueDate).toLocaleDateString()}</span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-xs text-[#6B5E55] dark:text-[#A89B91]">
-                <div>
-                  <p className="font-medium">Total Amount</p>
-                  <p className="font-mono tabular-nums text-[#2C221E] dark:text-[#F5EFE6] font-bold">
-                    ${Number(bill.totalAmount).toFixed(2)}
-                  </p>
-                </div>
-                <div>
-                  <p className="font-medium">Amount Due</p>
-                  <p className="font-mono tabular-nums text-[#B91C1C] dark:text-[#F87171] font-bold">
-                    ${Number(bill.amountDue).toFixed(2)}
-                  </p>
-                </div>
-                {bill.purchaseOrderNumber && (
-                  <div className="col-span-2">
-                    <p className="font-medium">Originating PO</p>
-                    <p className="text-[#2C221E] dark:text-[#F5EFE6]">{bill.purchaseOrderNumber}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-3 border-t border-[#E6DFD5]/50 dark:border-[#382D27] flex flex-wrap items-center gap-2">
-                {bill.state === 'draft' && ['admin', 'accountant'].includes(user?.role) && (
-                  <button
-                    onClick={() => handleConfirm(bill.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    Confirm Bill
-                  </button>
-                )}
-                {bill.state === 'posted' && bill.paymentStatus !== 'paid' && ['admin', 'accountant'].includes(user?.role) && (
-                  <button
-                    onClick={() => openPaymentModal(bill)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#B45309] text-white hover:bg-[#92400E] rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-                  >
-                    <DollarSign className="w-3.5 h-3.5" />
-                    Register Payment
-                  </button>
-                )}
+              <div className="flex items-center justify-between text-xs pt-1">
+                <span className="text-[#6B5E55]">Balance: <strong className="text-[#B45309]">₹{Number(bill.amountDue).toLocaleString('en-IN')}</strong></span>
+                <span className="font-bold text-[#B45309]">View Details →</span>
               </div>
             </div>
           ))}
-          {filteredBills.length === 0 && !loading && (
-            <div className="col-span-full py-8 text-center text-sm text-[#6B5E55]">
-              No vendor bills found.
-            </div>
-          )}
         </div>
       )}
 
-      {/* Create Bill Modal */}
+      {/* CREATE BILL MODAL */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-          <div className="bg-white dark:bg-[#1C1613] rounded-2xl border border-[#E6DFD5] dark:border-[#382D27] p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-xl space-y-4">
+          <div className="bg-white dark:bg-[#1C1613] rounded-2xl border border-[#E6DFD5] dark:border-[#382D27] p-6 max-w-2xl w-full shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
             <h3 className="font-heading font-bold text-lg text-[#2C221E] dark:text-[#F5EFE6]">
               Create Vendor Bill
             </h3>
 
             <form onSubmit={handleCreateBill} className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Vendor *</label>
                   <select
                     required
                     value={formData.vendorId}
                     onChange={e => setFormData({ ...formData, vendorId: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D]"
+                    className="w-full px-3 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6]"
                   >
-                    <option value="">Select a vendor...</option>
+                    <option value="">Select Vendor</option>
                     {vendors.map(v => (
                       <option key={v.id} value={v.id}>{v.name}</option>
                     ))}
                   </select>
                 </div>
+
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Bill Reference</label>
                   <input
                     type="text"
+                    placeholder="e.g. INV-9901"
                     value={formData.billReference}
                     onChange={e => setFormData({ ...formData, billReference: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D]"
+                    className="w-full px-3 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6]"
                   />
                 </div>
+
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Invoice Date *</label>
                   <input
@@ -365,9 +657,10 @@ export default function VendorBillsModule() {
                     required
                     value={formData.invoiceDate}
                     onChange={e => setFormData({ ...formData, invoiceDate: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D]"
+                    className="w-full px-3 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6]"
                   />
                 </div>
+
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Due Date *</label>
                   <input
@@ -375,103 +668,118 @@ export default function VendorBillsModule() {
                     required
                     value={formData.dueDate}
                     onChange={e => setFormData({ ...formData, dueDate: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D]"
+                    className="w-full px-3 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6]"
                   />
                 </div>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold">Bill Lines *</label>
+              {/* Bill Lines */}
+              <div className="space-y-2 pt-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-[#2C221E] dark:text-[#F5EFE6]">Bill Lines</h4>
                   <button
                     type="button"
                     onClick={handleAddLine}
-                    className="text-[#B45309] hover:text-[#92400E] font-semibold flex items-center gap-1 cursor-pointer"
+                    className="text-[#B45309] hover:underline font-semibold text-xs cursor-pointer"
                   >
-                    <Plus className="w-3.5 h-3.5" /> Add Line
+                    + Add Line
                   </button>
                 </div>
-                
-                {formData.lines.length === 0 ? (
-                  <div className="text-center py-4 text-[#6B5E55] border border-dashed border-[#E6DFD5] dark:border-[#382D27] rounded-lg">
-                    No lines added. Click "Add Line" to start.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {formData.lines.map((line, index) => (
-                      <div key={index} className="flex flex-col gap-2 bg-[#FAF6EE] dark:bg-[#29211D] p-3 rounded-lg border border-[#E6DFD5] dark:border-[#382D27]">
-                        <div className="flex items-center gap-2">
-                          <select
-                            required
-                            value={line.productId}
-                            onChange={e => handleLineChange(index, 'productId', e.target.value)}
-                            className="flex-1 px-2 py-1.5 rounded border border-[#E6DFD5] dark:border-[#382D27] bg-white dark:bg-[#1C1613]"
-                          >
-                            <option value="">Select Product...</option>
-                            {products.map(p => (
-                              <option key={p.id} value={p.id}>{p.name}</option>
-                            ))}
-                          </select>
-                          <select
-                            required
-                            value={line.accountId}
-                            onChange={e => handleLineChange(index, 'accountId', e.target.value)}
-                            className="flex-1 px-2 py-1.5 rounded border border-[#E6DFD5] dark:border-[#382D27] bg-white dark:bg-[#1C1613]"
-                          >
-                            <option value="">Select Account (Expense)...</option>
-                            {accounts.map(a => (
-                              <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                            ))}
-                          </select>
+
+                {formData.lines.map((line, idx) => (
+                  <div key={idx} className="p-3 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE]/50 dark:bg-[#29211D]/40 space-y-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-[#6B5E55]">Product</label>
+                        <select
+                          required
+                          value={line.productId}
+                          onChange={e => handleLineChange(idx, 'productId', e.target.value)}
+                          className="w-full px-2 py-1 rounded border border-[#E6DFD5] dark:border-[#382D27] bg-white dark:bg-[#1C1613] text-[#2C221E] dark:text-[#F5EFE6]"
+                        >
+                          <option value="">Select Product</option>
+                          {products.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] text-[#6B5E55]">Chart Account</label>
+                        <select
+                          required
+                          value={line.accountId}
+                          onChange={e => handleLineChange(idx, 'accountId', e.target.value)}
+                          className="w-full px-2 py-1 rounded border border-[#E6DFD5] dark:border-[#382D27] bg-white dark:bg-[#1C1613] text-[#2C221E] dark:text-[#F5EFE6]"
+                        >
+                          <option value="">Select Account</option>
+                          {accounts.map(a => (
+                            <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] text-[#6B5E55]">Analytic Account</label>
+                        <select
+                          value={line.analyticAccountId}
+                          onChange={e => handleLineChange(idx, 'analyticAccountId', e.target.value)}
+                          className="w-full px-2 py-1 rounded border border-[#E6DFD5] dark:border-[#382D27] bg-white dark:bg-[#1C1613] text-[#2C221E] dark:text-[#F5EFE6]"
+                        >
+                          <option value="">None</option>
+                          {analyticAccounts.map(aa => (
+                            <option key={aa.id} value={aa.id}>{aa.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-1">
+                        <div>
+                          <label className="block text-[10px] text-[#6B5E55]">Qty</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={line.quantity}
+                            onChange={e => handleLineChange(idx, 'quantity', e.target.value)}
+                            className="w-full px-2 py-1 rounded border border-[#E6DFD5] dark:border-[#382D27] bg-white dark:bg-[#1C1613] text-[#2C221E] dark:text-[#F5EFE6]"
+                          />
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div>
+                          <label className="block text-[10px] text-[#6B5E55]">Price</label>
                           <input
                             type="number"
                             step="0.01"
-                            required
-                            placeholder="Qty"
-                            value={line.quantity}
-                            onChange={e => handleLineChange(index, 'quantity', e.target.value)}
-                            className="w-20 px-2 py-1.5 rounded border border-[#E6DFD5] dark:border-[#382D27] bg-white dark:bg-[#1C1613] text-center"
+                            value={line.unitPrice}
+                            onChange={e => handleLineChange(idx, 'unitPrice', e.target.value)}
+                            className="w-full px-2 py-1 rounded border border-[#E6DFD5] dark:border-[#382D27] bg-white dark:bg-[#1C1613] text-[#2C221E] dark:text-[#F5EFE6]"
                           />
-                          <div className="flex items-center gap-2">
-                            <span className="text-[#6B5E55]">$</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              required
-                              placeholder="Price"
-                              value={line.unitPrice}
-                              onChange={e => handleLineChange(index, 'unitPrice', e.target.value)}
-                              className="w-24 px-2 py-1.5 rounded border border-[#E6DFD5] dark:border-[#382D27] bg-white dark:bg-[#1C1613]"
-                            />
-                          </div>
-                          <div className="flex-1"></div>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveLine(index)}
-                            className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
-                          >
-                            <XCircle className="w-4 h-4" />
-                          </button>
                         </div>
                       </div>
-                    ))}
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveLine(idx)}
+                        className="text-red-500 hover:underline text-[10px] font-semibold cursor-pointer"
+                      >
+                        Remove Line
+                      </button>
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
 
-              <div className="pt-4 flex items-center justify-end gap-2 border-t border-[#E6DFD5] dark:border-[#382D27]">
+              <div className="pt-3 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-[#F3ECE0] dark:hover:bg-[#382D27]"
+                  className="px-4 py-2 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] text-slate-700 dark:text-slate-300 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="bg-[#B45309] hover:bg-[#92400E] text-white px-4 py-2 rounded-lg font-semibold cursor-pointer shadow-sm"
+                  className="bg-[#B45309] hover:bg-[#92400E] text-white px-4 py-2 rounded-lg font-semibold cursor-pointer"
                 >
                   Create Bill
                 </button>
@@ -481,16 +789,19 @@ export default function VendorBillsModule() {
         </div>
       )}
 
-      {/* Payment Modal */}
-      {showPaymentModal && selectedBill && (
+      {/* PAYMENT MODAL FOR LIST VIEW */}
+      {showPaymentModal && billDocument && (
         <PaymentModal
-          document={selectedBill}
+          document={billDocument}
           type="outbound"
           onClose={() => setShowPaymentModal(false)}
           onSuccess={() => {
+            setMessage({ type: 'success', text: 'Payment registered, confirmed and posted to ledger!' });
             setShowPaymentModal(false);
-            setMessage({ type: 'success', text: 'Payment registered successfully!' });
             fetchVendorBills();
+            if (selectedBillId) {
+              loadBillDetail(selectedBillId);
+            }
           }}
         />
       )}

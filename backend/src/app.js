@@ -15,6 +15,7 @@ import paymentsRoutes from './routes/payments.routes.js';
 import salesOrdersRoutes from './routes/salesOrders.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
 import budgetsRoutes from './routes/budgets.routes.js';
+import customerInvoicesRoutes from './routes/customerInvoices.routes.js';
 
 const app = express();
 
@@ -53,7 +54,7 @@ app.use(['/api/v1/purchase-orders', '/api/purchase-orders', '/purchase-orders'],
 app.use(['/api/v1/vendor-bills', '/api/vendor-bills', '/vendor-bills'], vendorBillsRoutes);
 app.use(['/api/v1/payments', '/api/payments', '/payments'], paymentsRoutes);
 app.use(['/api/v1/sales-orders', '/api/sales-orders', '/sales-orders'], salesOrdersRoutes);
-app.use(['/api/v1/sales-orders', '/api/sales-orders', '/sales-orders'], salesOrdersRoutes);
+app.use(['/api/v1/customer-invoices', '/api/customer-invoices', '/customer-invoices'], customerInvoicesRoutes);
 app.use(['/api/v1/reports', '/api/reports', '/reports'], reportsRoutes);
 app.use(['/api/v1/budgets', '/api/budgets', '/budgets'], budgetsRoutes);
 

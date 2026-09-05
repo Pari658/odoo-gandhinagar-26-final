@@ -1,6 +1,6 @@
 import rateLimit from 'express-rate-limit';
 
-const createRateLimiter = (maxRequests, windowMs = 15 * 60 * 4000) => {
+const createRateLimiter = (maxRequests, windowMs = 90 * 60 * 1000) => {
   return rateLimit({
     windowMs,
     max: maxRequests,
@@ -19,8 +19,6 @@ const createRateLimiter = (maxRequests, windowMs = 15 * 60 * 4000) => {
   });
 };
 
-// Strict rate limiter for authentication endpoints (e.g., login, signup)
-export const authLimiter = createRateLimiter(15); // 15 requests per 15 minutes
-
-// Standard rate limiter for all other API endpoints
-export const apiLimiter = createRateLimiter(100); // 100 requests per 15 minutes
+// Rate limiter configured for 90-minute window
+export const authLimiter = createRateLimiter(50, 90 * 60 * 1000); // 50 requests per 90 minutes
+export const apiLimiter = createRateLimiter(500, 90 * 60 * 1000); // 500 requests per 90 minutes
