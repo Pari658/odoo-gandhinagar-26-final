@@ -11,7 +11,7 @@ router.use(authenticateToken);
 
 router.get('/', validate(masterDataSchema.taxRate.list), getTaxRates);
 router.post('/', requireRole('admin', 'accountant'), validate(masterDataSchema.taxRate.create), createTaxRate);
-router.put('/:id', requireRole('admin', 'accountant'), validate(commonSchema.uuidParam), updateTaxRate);
-router.delete('/:id', requireRole('admin', 'accountant'), validate(commonSchema.uuidParam), deleteTaxRate);
+router.put('/:id', requireRole('admin', 'accountant'), validate(masterDataSchema.taxRate.update), updateTaxRate);
+router.delete('/:id', requireRole('admin', 'accountant'), validate(masterDataSchema.taxRate.getById), deleteTaxRate);
 
 export default router;

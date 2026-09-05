@@ -90,8 +90,11 @@ export async function handleGetSalesOrders(req, res) {
     const page = parseInt(req.query.page, 10) || 1;
     const pageSize = parseInt(req.query.pageSize, 10) || 10;
     const search = req.query.search || '';
+    
+    const userRole = req.user?.role;
+    const contactId = req.user?.contactId;
 
-    const result = await getSalesOrders({ page, pageSize, search });
+    const result = await getSalesOrders({ page, pageSize, search, userRole, contactId });
 
     res.json({ success: true, data: result, error: null });
   } catch (err) {

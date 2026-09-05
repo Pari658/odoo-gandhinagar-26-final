@@ -112,7 +112,7 @@ export default function AccountDetail({ account, onBack, onEdit, onDelete }) {
               <div className="flex flex-col gap-1">
                 <span className="text-[#6B5E55] dark:text-[#A89B91] text-xs">Record Creation Date</span>
                 <span className="font-medium text-[#2C221E] dark:text-[#F5EFE6]">
-                  {new Date(account.created_at).toLocaleString()}
+                  {account.createdAt ? new Date(account.createdAt).toLocaleString() : 'N/A'}
                 </span>
               </div>
             </div>

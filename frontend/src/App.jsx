@@ -52,10 +52,12 @@ export default function App() {
 
   const isStaff = user?.role === 'admin' || user?.role === 'accountant';
 
-  // If role is contact and activeTab is reports or dashboard, fallback to contacts
+  // If role is contact, restrict default tabs
   useEffect(() => {
-    if (user && !isStaff && (activeTab === 'reports' || activeTab === 'dashboard')) {
-      setActiveTab('contacts');
+    if (user && !isStaff) {
+      if (['dashboard', 'reports', 'contacts', 'products', 'accounts', 'journals', 'tax-rates', 'analytic-accounts', 'budget'].includes(activeTab)) {
+        setActiveTab('sales-orders');
+      }
     }
   }, [user, isStaff, activeTab]);
 
@@ -70,21 +72,23 @@ export default function App() {
     return <AuthPage onBack={() => setShowLanding(true)} />;
   }
 
-  const allTabs = [
-    ...(isStaff ? [
-      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { id: 'reports', label: 'Reports & Statements', icon: Scale }
-    ] : []),
+  const allTabs = isStaff ? [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'sales-orders', label: 'Sales Orders', icon: ShoppingCart },
+    { id: 'purchase-orders', label: 'Purchase Orders', icon: ShoppingCart },
     { id: 'contacts', label: 'Contact Master', icon: Users },
     { id: 'products', label: 'Product Master', icon: Package },
     { id: 'accounts', label: 'Chart of Accounts', icon: BookOpen },
     { id: 'journals', label: 'Journals Master', icon: BookMarked },
     { id: 'tax-rates', label: 'Tax Rates', icon: Percent },
     { id: 'analytic-accounts', label: 'Analytic Accounts', icon: PieChart },
-    { id: 'purchase-orders', label: 'Purchase Orders', icon: ShoppingCart },
     { id: 'vendor-bills', label: 'Vendor Bills', icon: FileText },
-    { id: 'budget', label: 'Budget', icon: Wallet }
+    { id: 'budget', label: 'Budget', icon: Wallet },
+    { id: 'reports', label: 'Reports & Statements', icon: Scale }
+  ] : [
+    { id: 'sales-orders', label: 'My Orders', icon: ShoppingCart },
+    { id: 'purchase-orders', label: 'My Purchases', icon: ShoppingCart },
+    { id: 'vendor-bills', label: 'My Bills', icon: FileText }
   ];
 
   return (

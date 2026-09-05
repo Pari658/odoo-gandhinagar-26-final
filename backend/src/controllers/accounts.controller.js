@@ -102,3 +102,70 @@ export async function createAccount(req, res, next) {
     next(err);
   }
 }
+
+export async function updateAccount(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { name, type, reportGroup } = req.body;
+
+    const currentRes = await pool.query('SELECT * FROM chart_of_accounts WHERE id = $1 AND is_archived = false', [id]);
+    if (currentRes.rows.length === 0) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Account not found' } });
+    }
+    const currentAccount = currentRes.rows[0];
+
+    const newName = name !== undefined ? name : currentAccount.name;
+    const newType = type !== undefined ? type : currentAccount.type;
+    let newReportGroup = reportGroup;
+    if (newReportGroup === undefined) {
+      if (type !== undefined) {
+        newReportGroup = ['asset', 'liability', 'bank', 'cash', 'capital'].includes(newType) ? 'balance_sheet' : 'profit_and_loss';
+      } else {
+        newReportGroup = currentAccount.report_group;
+      }
+    }
+
+    const result = await pool.query(
+      `UPDATE chart_of_accounts 
+       SET name = $1, type = $2, report_group = $3
+       WHERE id = $4
+       RETURNING id, name, type, report_group, is_archived, created_at`,
+      [newName, newType, newReportGroup, id]
+    );
+
+    const updatedAccount = result.rows[0];
+    return res.json({
+      success: true,
+      data: {
+        id: updatedAccount.id,
+        name: updatedAccount.name,
+        type: updatedAccount.type,
+        reportGroup: updatedAccount.report_group,
+        isArchived: updatedAccount.is_archived,
+        createdAt: updatedAccount.created_at
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteAccount(req, res, next) {
+  try {
+    const { id } = req.params;
+    
+    // Soft delete
+    const result = await pool.query(
+      'UPDATE chart_of_accounts SET is_archived = true WHERE id = $1 RETURNING id',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Account not found' } });
+    }
+
+    return res.json({ success: true, data: { message: 'Account deleted successfully' } });
+  } catch (err) {
+    next(err);
+  }
+}

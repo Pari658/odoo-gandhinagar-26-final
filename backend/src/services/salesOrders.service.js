@@ -107,19 +107,24 @@ export async function createSalesOrder({ customerId, orderDate, lines, createdBy
   }
 }
 
-export async function getSalesOrders({ page = 1, pageSize = 10, search = '' } = {}) {
+export async function getSalesOrders({ page = 1, pageSize = 10, search = '', userRole = 'admin', contactId = null } = {}) {
   const limit = parseInt(pageSize, 10) || 10;
   const offset = (page - 1) * limit;
 
-  let whereClause = '';
-  const paramsCount = [];
-  const paramsSelect = [limit, offset];
+  let whereConditions = [];
+  const params = [];
+
+  if (userRole === 'contact' && contactId) {
+    params.push(contactId);
+    whereConditions.push(`so.customer_id = $${params.length}`);
+  }
 
   if (search) {
-    whereClause = 'WHERE so.number ILIKE $1 OR c.name ILIKE $1';
-    paramsCount.push(`%${search}%`);
-    paramsSelect.push(`%${search}%`);
+    params.push(`%${search}%`);
+    whereConditions.push(`(so.number ILIKE $${params.length} OR c.name ILIKE $${params.length})`);
   }
+
+  const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
   const countQuery = `
     SELECT COUNT(*) 
@@ -127,21 +132,22 @@ export async function getSalesOrders({ page = 1, pageSize = 10, search = '' } = 
     JOIN contacts c ON so.customer_id = c.id
     ${whereClause}
   `;
-  const countRes = await pool.query(countQuery, paramsCount);
+  const countRes = await pool.query(countQuery, params);
   const totalCount = parseInt(countRes.rows[0].count, 10);
 
-  // If search is used, it's parameter $3
+  // For selectQuery, we need to append limit and offset to the params array
+  const selectParams = [...params, limit, offset];
   const selectQuery = `
     SELECT so.*, c.name as customer_name 
     FROM sales_orders so 
     JOIN contacts c ON so.customer_id = c.id 
-    ${whereClause.replace(/\$1/g, '$3')}
+    ${whereClause}
     ORDER BY so.created_at DESC 
-    LIMIT $1 OFFSET $2
+    LIMIT $${selectParams.length - 1} OFFSET $${selectParams.length}
   `;
-  const soRes = await pool.query(selectQuery, paramsSelect);
+  const res = await pool.query(selectQuery, selectParams);
 
-  const items = soRes.rows.map(so => ({
+  const items = res.rows.map(so => ({
     id: so.id,
     number: so.number,
     customerId: so.customer_id,
