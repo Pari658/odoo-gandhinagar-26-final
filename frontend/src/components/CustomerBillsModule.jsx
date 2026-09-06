@@ -169,6 +169,7 @@ export default function CustomerBillsModule() {
               <thead className="bg-[#FAF6EE] dark:bg-[#29211D] text-[#6B5E55] dark:text-[#A89B91] font-semibold border-b border-[#E6DFD5] dark:border-[#382D27]">
                 <tr>
                   <th className="p-3.5">Bill Number</th>
+                  <th className="p-3.5">Linked Order</th>
                   <th className="p-3.5">Invoice Date</th>
                   <th className="p-3.5">Due Date</th>
                   <th className="p-3.5 text-right">Total Amount</th>
@@ -183,6 +184,9 @@ export default function CustomerBillsModule() {
                   <tr key={bill.id} className="hover:bg-[#FAF6EE]/50 dark:hover:bg-[#29211D]/40 transition-colors">
                     <td className="p-3.5 font-bold text-[#B45309] dark:text-amber-400">
                       {bill.number}
+                    </td>
+                    <td className="p-3.5 font-medium text-[#6B5E55] dark:text-[#A89B91]">
+                      {bill.salesOrderNumber || 'Direct Invoice'}
                     </td>
                     <td className="p-3.5 text-[#6B5E55] dark:text-[#A89B91]">
                       {bill.invoiceDate}
@@ -229,7 +233,7 @@ export default function CustomerBillsModule() {
                   Invoice {selectedBill.number}
                 </h3>
                 <p className="text-xs text-[#6B5E55] dark:text-[#A89B91]">
-                  Issued to: {selectedBill.customerName} ({selectedBill.customerEmail})
+                  Issued to: {selectedBill.customerName} ({selectedBill.customerEmail || 'Customer'})
                 </p>
               </div>
               <button onClick={() => setSelectedBill(null)} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">✕</button>
@@ -245,10 +249,14 @@ export default function CustomerBillsModule() {
                 <div className="font-semibold">{selectedBill.dueDate}</div>
               </div>
               <div>
+                <span className="text-[#6B5E55] dark:text-[#A89B91]">Linked Sales Order:</span>
+                <div className="font-semibold text-[#B45309]">{selectedBill.salesOrderNumber || 'N/A'}</div>
+              </div>
+              <div>
                 <span className="text-[#6B5E55] dark:text-[#A89B91]">Current Status:</span>
                 <div className="mt-0.5">{getStatusBadge(selectedBill.status)}</div>
               </div>
-              <div>
+              <div className="col-span-2">
                 <span className="text-[#6B5E55] dark:text-[#A89B91]">Balance Due:</span>
                 <div className="font-bold text-amber-800 dark:text-amber-300">
                   ₹{(selectedBill.balanceDue || (selectedBill.totalAmount - selectedBill.amountPaid)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}

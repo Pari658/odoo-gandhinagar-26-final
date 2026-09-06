@@ -6,14 +6,18 @@ export async function getCustomerInvoices(req, res, next) {
     const pageSize = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
     const offset = (page - 1) * pageSize;
     const params = [];
-    const filters = ['ci.amount_paid < ci.total_amount'];
+    const filters = [];
+
+    if (req.query.unpaidOnly === 'true') {
+      filters.push('ci.amount_paid < ci.total_amount');
+    }
 
     if (req.user.role === 'contact') {
       params.push(req.user.contactId || null);
       filters.push(`ci.customer_id = $${params.length}`);
     }
 
-    const where = `WHERE ${filters.join(' AND ')}`;
+    const where = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
     const from = `
       FROM customer_invoices ci
       JOIN contacts c ON c.id = ci.customer_id
@@ -49,6 +53,91 @@ export async function getCustomerInvoices(req, res, next) {
         page,
         pageSize,
         totalCount: Number(countResult.rows[0].count)
+      },
+      error: null
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getMyBills(req, res, next) {
+  try {
+    const contactId = req.user.contactId;
+
+    let queryText = `
+      SELECT ci.id, ci.number, ci.customer_id, c.name AS customer_name, c.email AS customer_email,
+             ci.invoice_date, ci.due_date, ci.total_amount, ci.amount_paid, ci.status,
+             so.number AS sales_order_number, so.order_date AS sales_order_date
+      FROM customer_invoices ci
+      JOIN contacts c ON c.id = ci.customer_id
+      LEFT JOIN sales_orders so ON so.id = ci.sales_order_id
+    `;
+    const params = [];
+
+    if (req.user.role === 'contact') {
+      if (!contactId) {
+        return res.json({ success: true, data: { items: [], totalCount: 0 }, error: null });
+      }
+      params.push(contactId);
+      queryText += ` WHERE ci.customer_id = $1`;
+    }
+
+    queryText += ` ORDER BY ci.created_at DESC`;
+
+    const result = await pool.query(queryText, params);
+    const invoices = result.rows;
+
+    if (invoices.length === 0) {
+      return res.json({ success: true, data: { items: [], totalCount: 0 }, error: null });
+    }
+
+    const invoiceIds = invoices.map(i => i.id);
+    const linesResult = await pool.query(`
+      SELECT cil.id, cil.customer_invoice_id, cil.product_id, p.name AS product_name,
+             cil.quantity, cil.unit_price
+      FROM customer_invoice_lines cil
+      LEFT JOIN products p ON p.id = cil.product_id
+      WHERE cil.customer_invoice_id = ANY($1::uuid[])
+    `, [invoiceIds]);
+
+    const linesByInvoice = {};
+    for (const l of linesResult.rows) {
+      if (!linesByInvoice[l.customer_invoice_id]) {
+        linesByInvoice[l.customer_invoice_id] = [];
+      }
+      linesByInvoice[l.customer_invoice_id].push({
+        id: l.id,
+        productId: l.product_id,
+        productName: l.product_name || 'Product Item',
+        quantity: Number(l.quantity),
+        unitPrice: Number(l.unit_price),
+        total: Number(l.quantity) * Number(l.unit_price)
+      });
+    }
+
+    const items = invoices.map(inv => ({
+      id: inv.id,
+      number: inv.number,
+      customerId: inv.customer_id,
+      customerName: inv.customer_name,
+      customerEmail: inv.customer_email,
+      invoiceDate: inv.invoice_date,
+      dueDate: inv.due_date,
+      totalAmount: Number(inv.total_amount),
+      amountPaid: Number(inv.amount_paid),
+      balanceDue: Number(inv.total_amount) - Number(inv.amount_paid),
+      status: inv.status,
+      salesOrderNumber: inv.sales_order_number || null,
+      salesOrderDate: inv.sales_order_date || null,
+      lines: linesByInvoice[inv.id] || []
+    }));
+
+    return res.json({
+      success: true,
+      data: {
+        items,
+        totalCount: items.length
       },
       error: null
     });

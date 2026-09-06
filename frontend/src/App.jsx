@@ -8,6 +8,7 @@ import TaxRatesModule from './components/TaxRatesModule.jsx';
 import AnalyticAccountsModule from './components/AnalyticAccountsModule.jsx';
 import PurchaseOrdersModule from './components/PurchaseOrdersModule.jsx';
 import VendorBillsModule from './components/VendorBillsModule.jsx';
+import CustomerBillsModule from './components/CustomerBillsModule.jsx';
 import PaymentsModule from './components/PaymentsModule.jsx';
 import SalesOrdersModule from './components/SalesOrdersModule.jsx';
 import ReportsModule from './components/ReportsModule.jsx';
@@ -50,11 +51,11 @@ export default function App() {
 
   const isStaff = user?.role === 'admin' || user?.role === 'accountant';
 
-  // If role is contact, restrict default tabs
+  // If role is contact, restrict default tab to 'my-bills'
   useEffect(() => {
     if (user && !isStaff) {
-      if (['dashboard', 'reports', 'contacts', 'products', 'accounts', 'journals', 'tax-rates', 'analytic-accounts', 'budget'].includes(activeTab)) {
-        setActiveTab('sales-orders');
+      if (activeTab !== 'my-bills') {
+        setActiveTab('my-bills');
       }
     }
   }, [user, isStaff, activeTab]);
@@ -84,9 +85,7 @@ export default function App() {
     { id: 'payments', label: 'Payments', icon: CreditCard },
     { id: 'reports', label: 'Reports & Statements', icon: Scale }
   ] : [
-    { id: 'sales-orders', label: 'My Orders', icon: ShoppingCart },
-    { id: 'purchase-orders', label: 'My Purchases', icon: ShoppingCart },
-    { id: 'vendor-bills', label: 'My Bills', icon: FileText }
+    { id: 'my-bills', label: 'My Purchases & Bills', icon: FileText }
   ];
 
   return (
@@ -109,6 +108,7 @@ export default function App() {
           {activeTab === 'purchase-orders' && <PurchaseOrdersModule />}
           {activeTab === 'vendor-bills' && <VendorBillsModule />}
           {activeTab === 'payments' && <PaymentsModule />}
+          {activeTab === 'my-bills' && <CustomerBillsModule />}
         </div>
       </main>
     </div>
