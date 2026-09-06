@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
+import { apiRequest } from '../api/client.js';
 import { Armchair, Key, UserPlus, ArrowRight, CheckCircle2, HelpCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 
 export default function AuthPage({ onBack }) {
   const { login, signup, loading } = useAuth();
   
-  // View Modes: 'login' | 'signup' | 'forgot'
+  // View Modes: 'login' | 'signup' | 'forgot' | 'reset'
   const [mode, setMode] = useState('login');
 
   // Form Fields
@@ -18,6 +19,7 @@ export default function AuthPage({ onBack }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [role, setRole] = useState('customer');     // customer | vendor | both
+  const [resetToken, setResetToken] = useState(''); // Store the reset token
 
   const [errorMsg, setErrorMsg] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
@@ -100,7 +102,48 @@ export default function AuthPage({ onBack }) {
         setErrorMsg('Please enter your registered Login ID or Email Address');
         return;
       }
-      setSuccessMsg('Password reset link has been sent to your email address (UI Preview).');
+      try {
+        const res = await apiRequest('POST', '/auth/forgot-password', { loginId: loginInput, email: loginInput });
+        if (res.devToken) {
+          setSuccessMsg(`Dev Mode: Token generated successfully! Please copy it if needed. Auto-filled below.`);
+          setResetToken(res.devToken);
+          setMode('reset');
+        } else {
+          setSuccessMsg('If an account exists, a reset link was generated.');
+        }
+      } catch (err) {
+        setErrorMsg(err.message || 'Failed to request password reset');
+      }
+    } else if (mode === 'reset') {
+      if (!resetToken || !password || !confirmPassword) {
+        setErrorMsg('Please fill in all fields');
+        return;
+      }
+      
+      const hasSmall = /[a-z]/.test(password);
+      const hasLarge = /[A-Z]/.test(password);
+      const hasSpecial = /[^A-Za-z0-9]/.test(password);
+      const isMoreThan8 = password.length > 8;
+
+      if (!hasSmall || !hasLarge || !hasSpecial || !isMoreThan8) {
+        setErrorMsg('Password must be unique and must contain a small case, a large case and a special character and length should be more than 8 characters');
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        setErrorMsg('Passwords do not match');
+        return;
+      }
+
+      try {
+        await apiRequest('POST', '/auth/reset-password', { token: resetToken, newPassword: password });
+        setSuccessMsg('Password has been reset successfully! You can now log in.');
+        setMode('login');
+        setPassword('');
+        setConfirmPassword('');
+      } catch (err) {
+        setErrorMsg(err.message || 'Failed to reset password');
+      }
     }
   };
 
@@ -142,16 +185,19 @@ export default function AuthPage({ onBack }) {
               {mode === 'signup' && <UserPlus className="w-5 h-5 text-[#714B67]" />}
               {mode === 'login' && <Key className="w-5 h-5 text-[#B45309]" />}
               {mode === 'forgot' && <HelpCircle className="w-5 h-5 text-amber-600" />}
+              {mode === 'reset' && <Key className="w-5 h-5 text-amber-600" />}
               <span>
                 {mode === 'signup' && 'Create Account'}
                 {mode === 'login' && 'Sign In'}
                 {mode === 'forgot' && 'Reset Password'}
+                {mode === 'reset' && 'Set New Password'}
               </span>
             </h2>
             <span className="text-[10px] font-semibold uppercase px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800">
               {mode === 'signup' && 'Invoicing User Signup'}
               {mode === 'login' && 'User Portal'}
               {mode === 'forgot' && 'Password Recovery'}
+              {mode === 'reset' && 'Account Recovery'}
             </span>
           </div>
 
@@ -422,6 +468,108 @@ export default function AuthPage({ onBack }) {
               </>
             )}
 
+            {/* RESET PASSWORD MODE */}
+            {mode === 'reset' && (
+              <>
+                <p className="text-xs text-[#6B5E55] dark:text-[#A89B91]">
+                  Enter the reset token (auto-filled for this demo) and your new password.
+                </p>
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                    Reset Token *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter reset token"
+                    value={resetToken}
+                    onChange={e => setResetToken(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6] focus:outline-none focus:ring-2 focus:ring-[#B45309]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                      New Password *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={e => {
+                          setPassword(e.target.value);
+                          if (errorMsg) setErrorMsg(null);
+                        }}
+                        className="w-full px-3 py-2.5 pr-9 rounded-lg border border-[#E6DFD5] dark:border-[#382D27] bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6] focus:outline-none focus:ring-2 focus:ring-[#B45309]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#6B5E55] dark:text-[#A89B91] hover:text-[#B45309] cursor-pointer"
+                        title={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 flex items-center justify-between">
+                      <span>Confirm New Password *</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        required
+                        placeholder="••••••••"
+                        value={confirmPassword}
+                        onChange={e => {
+                          setConfirmPassword(e.target.value);
+                          if (errorMsg) setErrorMsg(null);
+                        }}
+                        className={`w-full px-3 py-2.5 pr-9 rounded-lg border bg-[#FAF6EE] dark:bg-[#29211D] text-[#2C221E] dark:text-[#F5EFE6] focus:outline-none focus:ring-2 ${
+                          confirmPassword ? (
+                            password === confirmPassword 
+                              ? 'border-emerald-500 focus:ring-emerald-500' 
+                              : 'border-red-500 focus:ring-red-500'
+                          ) : 'border-[#E6DFD5] dark:border-[#382D27] focus:ring-[#B45309]'
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#6B5E55] dark:text-[#A89B91] hover:text-[#B45309] cursor-pointer"
+                        title={showConfirmPassword ? "Hide password" : "Show password"}
+                      >
+                        {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-lg border border-[#E6DFD5]/70 dark:border-[#382D27] bg-[#FAF6EE]/50 dark:bg-[#29211D]/40 text-[10px] space-y-1">
+                  <span className="font-semibold block text-[#6B5E55] dark:text-[#A89B91]">Password Requirements:</span>
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                    <span className={password.length > 8 ? 'text-emerald-600 font-semibold' : 'text-slate-400'}>
+                      {password.length > 8 ? '✓' : '•'} Length &gt; 8 chars
+                    </span>
+                    <span className={/[a-z]/.test(password) ? 'text-emerald-600 font-semibold' : 'text-slate-400'}>
+                      {/[a-z]/.test(password) ? '✓' : '•'} Lowercase letter (a-z)
+                    </span>
+                    <span className={/[A-Z]/.test(password) ? 'text-emerald-600 font-semibold' : 'text-slate-400'}>
+                      {/[A-Z]/.test(password) ? '✓' : '•'} Uppercase letter (A-Z)
+                    </span>
+                    <span className={/[^A-Za-z0-9]/.test(password) ? 'text-emerald-600 font-semibold' : 'text-slate-400'}>
+                      {/[^A-Za-z0-9]/.test(password) ? '✓' : '•'} Special char (!@#...)
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
+
             {/* Submit Button */}
             <button
               type="submit"
@@ -434,7 +582,9 @@ export default function AuthPage({ onBack }) {
             >
               {loading ? 'Processing...' : (
                 mode === 'signup' ? 'Create Account' : (
-                  mode === 'forgot' ? 'Send Password Reset Link' : 'Sign In'
+                  mode === 'forgot' ? 'Send Password Reset Link' : (
+                    mode === 'reset' ? 'Reset Password' : 'Sign In'
+                  )
                 )
               )}
               <ArrowRight className="w-4 h-4" />

@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { query, pool, inMemoryStore } from '../db/index.js';
 import {
   generateAccessToken,
@@ -8,6 +9,9 @@ import {
 
 // Simple in-memory set for refresh tokens for the demo
 const refreshTokens = new Set();
+// Simple in-memory map for password reset tokens for the demo
+const resetTokens = new Map(); // token -> { userId, expiresAt }
+
 
 export async function login(req, res) {
   const loginInput = req.body.loginId || req.body.email || req.body.username;
@@ -317,7 +321,105 @@ export async function me(req, res) {
       },
       error: null
     });
+  } catch(err) {
+    console.log(err);
+  }
+}
+
+
+export async function forgotPassword(req, res) {
+  const loginInput = req.body.email || req.body.loginId;
+
+  if (!loginInput) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'VALIDATION_ERROR', message: 'Email or Login Id is required' }
+    });
+  }
+
+  let user = null;
+
+  try {
+    const dbRes = await pool.query(
+      `SELECT id, login_id, email, password_hash FROM users 
+       WHERE (email IS NOT NULL AND LOWER(email::text) = LOWER($1::text))
+          OR (login_id IS NOT NULL AND LOWER(login_id::text) = LOWER($1::text))
+       LIMIT 1`,
+      [loginInput.trim()]
+    );
+    if (dbRes && dbRes.rows && dbRes.rows.length > 0) {
+      user = dbRes.rows[0];
+    }
   } catch (err) {
-    return res.status(500).json({ success: false, data: null, error: { code: 'SERVER_ERROR', message: err.message } });
+    console.warn('DB user query warning:', err.message);
+  }
+
+  if (!user) {
+    user = inMemoryStore.users.find(u =>
+      u.email?.toLowerCase() === loginInput.trim().toLowerCase() ||
+      u.login_id?.toLowerCase() === loginInput.trim().toLowerCase()
+    );
+  }
+
+  if (!user) {
+    // For security, don't reveal if user exists or not
+    return res.json({ 
+      success: true, 
+      data: { message: 'If an account exists, a reset link was generated.' }
+    });
+  }
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = Date.now() + 15 * 60 * 1000; // 15 mins
+
+  resetTokens.set(token, { userId: user.id, expiresAt });
+
+  // In a real application, send this token via email here.
+  // For the demo, we return it in the response so the UI can display it.
+  res.json({
+    success: true,
+    data: {
+      message: 'If an account exists, a reset link was generated.',
+      devToken: token // Only for demo purposes!
+    }
+  });
+}
+
+export async function resetPassword(req, res) {
+  const { token, newPassword } = req.body;
+
+  if (!token || !newPassword) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'VALIDATION_ERROR', message: 'Token and new password are required' }
+    });
+  }
+
+  const resetData = resetTokens.get(token);
+
+  if (!resetData || resetData.expiresAt < Date.now()) {
+    if (resetData) resetTokens.delete(token); // cleanup expired
+    return res.status(400).json({
+      success: false,
+      error: { code: 'INVALID_TOKEN', message: 'Invalid or expired reset token' }
+    });
+  }
+
+  const userId = resetData.userId;
+  const hashedPassword = bcrypt.hashSync(newPassword, 10);
+
+  try {
+    await pool.query(
+      'UPDATE users SET password_hash = $1 WHERE id = $2',
+      [hashedPassword, userId]
+    );
+
+    // Token used successfully, delete it
+    resetTokens.delete(token);
+
+    res.json({ success: true, data: { message: 'Password has been reset successfully' }});
+  } catch (err) {
+    console.error('Password reset error:', err);
+    res.status(500).json({ success: false, error: { message: 'Internal server error' } });
   }
 }

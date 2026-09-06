@@ -27,5 +27,21 @@ export const authSchema = {
     body: z.object({
       refreshToken: z.string().min(1, 'Refresh token is required')
     })
+  }),
+
+  forgotPassword: z.object({
+    body: z.object({
+      email: z.string().email('Invalid email address').optional(),
+      loginId: z.string().optional()
+    }).refine(data => data.email || data.loginId, {
+      message: 'Either email or loginId is required',
+    })
+  }),
+
+  resetPassword: z.object({
+    body: z.object({
+      token: z.string().min(1, 'Reset token is required'),
+      newPassword: z.string().min(9, 'Password length should be more than 8 characters')
+    })
   })
 };

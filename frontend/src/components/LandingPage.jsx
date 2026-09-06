@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, ShieldCheck, Database, LayoutDashboard, LayoutTemplate } from 'lucide-react';
+import { ArrowRight, LayoutTemplate, PackagePlus, ShoppingCart, TrendingUp } from 'lucide-react';
 
 export default function LandingPage({ onEnter }) {
   return (
@@ -28,24 +28,17 @@ export default function LandingPage({ onEnter }) {
         {/* Background glow effects */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-br from-[#B45309]/10 to-[#714B67]/10 dark:from-[#B45309]/20 dark:to-[#714B67]/20 blur-3xl rounded-full -z-10 animate-pulse-slow"></div>
 
-        <div className="max-w-4xl mx-auto text-center space-y-8 z-10 py-20">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#B45309]/10 dark:bg-[#B45309]/20 text-[#B45309] dark:text-[#F3A358] border border-[#B45309]/20 font-medium text-sm mb-4">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#B45309] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#B45309]"></span>
-            </span>
-            System v2.0 Live
-          </div>
+        <div className="max-w-4xl mx-auto text-center space-y-6 z-10 py-10">
           
-          <h1 className="text-5xl md:text-7xl font-bold font-heading tracking-tight leading-[1.1] text-transparent bg-clip-text bg-gradient-to-br from-[#2C221E] to-[#6B5E55] dark:from-white dark:to-[#A89B91]">
+          <h1 className="text-4xl md:text-6xl font-bold font-heading tracking-tight leading-[1.1] text-transparent bg-clip-text bg-gradient-to-br from-[#2C221E] to-[#6B5E55] dark:from-white dark:to-[#A89B91]">
             Next-Gen ERP for <br /> Modern Furniture Retail.
           </h1>
           
           <p className="text-lg md:text-xl text-[#6B5E55] dark:text-[#A89B91] max-w-2xl mx-auto leading-relaxed">
-            Experience the Warm Timber & Sand Birch aesthetic. A completely integrated double-entry accounting engine with lightning-fast PostgreSQL backend and React frontend.
+            Manage your inventory, sales, and accounting all in one place with a simple, integrated system built for growing furniture businesses.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
             <button 
               onClick={onEnter}
               className="group flex items-center gap-3 px-8 py-4 rounded-2xl bg-gradient-to-r from-[#B45309] to-[#92400e] text-white font-semibold text-lg hover:shadow-[0_0_40px_rgba(180,83,9,0.4)] transition-all hover:-translate-y-1 w-full sm:w-auto justify-center"
@@ -53,45 +46,62 @@ export default function LandingPage({ onEnter }) {
               Access Portal
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
-            <button className="flex items-center gap-3 px-8 py-4 rounded-2xl bg-white dark:bg-[#1C1613] text-[#2C221E] dark:text-white font-semibold text-lg border border-[#E6DFD5] dark:border-[#382D27] hover:bg-[#FAF6EE] dark:hover:bg-[#2C221E] transition-all w-full sm:w-auto justify-center">
-              View Architecture
-            </button>
           </div>
         </div>
 
-        {/* Feature Cards */}
-        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto mt-12 mb-20 z-10 w-full px-4">
-          <FeatureCard 
-            icon={Database} 
-            title="Supabase PostgreSQL" 
-            description="Bulletproof relational data integrity with native JSONB support."
-          />
-          <FeatureCard 
-            icon={LayoutDashboard} 
-            title="React + Vite + Tailwind" 
-            description="Blazing fast interactive dashboards with Warm Timber design system."
-          />
-          <FeatureCard 
-            icon={ShieldCheck} 
-            title="RBAC & JWT Security" 
-            description="Enterprise-grade stateless authentication and role-based access control."
-          />
-        </div>
-      </main>
-    </div>
-  );
-}
+        {/* How it Works Section */}
+        <div className="max-w-5xl mx-auto w-full px-4 pb-12 z-10">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl md:text-3xl font-heading font-bold text-[#2C221E] dark:text-[#F5EFE6]">
+              How it works
+            </h2>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-6 relative">
+            {/* Connecting line for desktop */}
+            <div className="hidden md:block absolute top-12 left-[15%] right-[15%] h-0.5 bg-gradient-to-r from-transparent via-[#B45309]/30 to-transparent -z-10"></div>
+            
+            <div className="flex flex-col items-center text-center space-y-3">
+              <div className="w-20 h-20 rounded-full bg-white dark:bg-[#1C1613] border border-[#E6DFD5] dark:border-[#382D27] flex items-center justify-center shadow-lg relative">
+                <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-[#B45309] text-white flex items-center justify-center font-bold text-xs border-2 border-[#FAF6EE] dark:border-[#120E0C]">1</div>
+                <PackagePlus className="w-8 h-8 text-[#B45309]" />
+              </div>
+              <h3 className="font-heading font-bold text-lg text-[#2C221E] dark:text-[#F5EFE6]">Add Inventory</h3>
+              <p className="text-[#6B5E55] dark:text-[#A89B91] text-xs leading-relaxed max-w-xs">
+                Easily input your raw materials and finished furniture into the smart catalog.
+              </p>
+            </div>
 
-function FeatureCard({ icon: Icon, title, description }) {
-  return (
-    <div className="p-6 rounded-2xl bg-white/60 dark:bg-[#1C1613]/60 backdrop-blur-xl border border-[#E6DFD5] dark:border-[#382D27] hover:border-[#B45309]/50 transition-colors group shadow-sm hover:shadow-xl">
-      <div className="w-12 h-12 rounded-xl bg-[#FAF6EE] dark:bg-[#2C221E] flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-[#B45309] transition-all duration-300">
-        <Icon className="w-6 h-6 text-[#B45309] group-hover:text-white transition-colors" />
-      </div>
-      <h3 className="font-heading font-bold text-lg mb-2">{title}</h3>
-      <p className="text-sm text-[#6B5E55] dark:text-[#A89B91] leading-relaxed">
-        {description}
-      </p>
+            <div className="flex flex-col items-center text-center space-y-3">
+              <div className="w-20 h-20 rounded-full bg-white dark:bg-[#1C1613] border border-[#E6DFD5] dark:border-[#382D27] flex items-center justify-center shadow-lg relative">
+                <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-[#B45309] text-white flex items-center justify-center font-bold text-xs border-2 border-[#FAF6EE] dark:border-[#120E0C]">2</div>
+                <ShoppingCart className="w-8 h-8 text-[#B45309]" />
+              </div>
+              <h3 className="font-heading font-bold text-lg text-[#2C221E] dark:text-[#F5EFE6]">Make Sales</h3>
+              <p className="text-[#6B5E55] dark:text-[#A89B91] text-xs leading-relaxed max-w-xs">
+                Process customer orders quickly with our intuitive Sales Kanban board.
+              </p>
+            </div>
+
+            <div className="flex flex-col items-center text-center space-y-3">
+              <div className="w-20 h-20 rounded-full bg-white dark:bg-[#1C1613] border border-[#E6DFD5] dark:border-[#382D27] flex items-center justify-center shadow-lg relative">
+                <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-[#B45309] text-white flex items-center justify-center font-bold text-xs border-2 border-[#FAF6EE] dark:border-[#120E0C]">3</div>
+                <TrendingUp className="w-8 h-8 text-[#B45309]" />
+              </div>
+              <h3 className="font-heading font-bold text-lg text-[#2C221E] dark:text-[#F5EFE6]">Track Profit</h3>
+              <p className="text-[#6B5E55] dark:text-[#A89B91] text-xs leading-relaxed max-w-xs">
+                Watch your accounting ledgers and budgets update in real-time.
+              </p>
+            </div>
+          </div>
+        </div>
+
+      </main>
+
+      {/* Footer */}
+      <footer className="w-full py-4 text-center border-t border-[#E6DFD5] dark:border-[#382D27] text-xs text-[#6B5E55] dark:text-[#A89B91] bg-white/50 dark:bg-[#1C1613]/50 backdrop-blur-sm z-10">
+        &copy; {new Date().getFullYear()} UrbanFurniture ERP. All rights reserved.
+      </footer>
     </div>
   );
 }
