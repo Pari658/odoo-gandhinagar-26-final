@@ -4,6 +4,7 @@ import {
   getSalesOrderById,
   confirmSalesOrder,
   updateSalesOrder,
+  invoiceSalesOrder,
 } from '../services/salesOrders.service.js';
 
 /**
@@ -177,3 +178,22 @@ export async function handleConfirmSalesOrder(req, res) {
     });
   }
 }
+
+/**
+ * POST /api/v1/sales-orders/:id/invoice
+ */
+export async function handleInvoiceSalesOrder(req, res) {
+  try {
+    const result = await invoiceSalesOrder(req.params.id);
+
+    res.json({ success: true, data: result, error: null });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      data: null,
+      error: { code: err.code || 'SERVER_ERROR', message: err.message },
+    });
+  }
+}
+

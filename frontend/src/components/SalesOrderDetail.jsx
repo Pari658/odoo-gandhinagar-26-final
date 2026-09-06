@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, CheckCircle2, FileText, Calendar, User, IndianRupee } from 'lucide-react';
-import { fetchSalesOrderById, confirmSalesOrder } from '../api/salesOrders.js';
+import { fetchSalesOrderById, confirmSalesOrder, invoiceSalesOrder } from '../api/salesOrders.js';
 
 export default function SalesOrderDetail({ id, onBack, onEdit, onStatusChange }) {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
   const [confirming, setConfirming] = useState(false);
+  const [invoicing, setInvoicing] = useState(false);
 
   useEffect(() => {
     loadOrder();
@@ -34,6 +35,19 @@ export default function SalesOrderDetail({ id, onBack, onEdit, onStatusChange })
       alert(err.message || 'Failed to confirm order');
     } finally {
       setConfirming(false);
+    }
+  };
+
+  const handleInvoice = async () => {
+    setInvoicing(true);
+    try {
+      const updated = await invoiceSalesOrder(id);
+      setOrder(updated);
+      if (onStatusChange) onStatusChange();
+    } catch (err) {
+      alert(err.message || 'Failed to create invoice from sales order');
+    } finally {
+      setInvoicing(false);
     }
   };
 
@@ -104,6 +118,17 @@ export default function SalesOrderDetail({ id, onBack, onEdit, onStatusChange })
                 {confirming ? 'Confirming...' : 'Confirm Order'}
               </button>
             </>
+          )}
+
+          {order.status === 'confirmed' && (
+            <button 
+              onClick={handleInvoice}
+              disabled={invoicing}
+              className="flex items-center justify-center gap-2 px-6 py-2 rounded-lg bg-amber-700 hover:bg-amber-800 text-white text-sm font-bold shadow-sm transition-all disabled:opacity-50"
+            >
+              <FileText className="w-4 h-4" />
+              {invoicing ? 'Creating Invoice...' : 'Create Invoice / Mark as Invoiced'}
+            </button>
           )}
         </div>
       </div>

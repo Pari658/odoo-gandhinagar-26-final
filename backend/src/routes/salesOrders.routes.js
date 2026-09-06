@@ -6,6 +6,7 @@ import {
   handleGetSalesOrderById,
   handleConfirmSalesOrder,
   handleUpdateSalesOrder,
+  handleInvoiceSalesOrder,
 } from '../controllers/salesOrders.controller.js';
 
 const router = Router();
@@ -20,5 +21,6 @@ router.get('/:id', handleGetSalesOrderById);
 router.post('/', requireRole('admin', 'accountant'), handleCreateSalesOrder);
 router.put('/:id', requireRole('admin', 'accountant'), handleUpdateSalesOrder);
 router.post('/:id/confirm', requireRole('admin', 'accountant'), handleConfirmSalesOrder);
+router.post('/:id/invoice', requireRole('admin', 'accountant'), handleInvoiceSalesOrder);
 
 export default router;
