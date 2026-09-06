@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { apiRequest } from '../api/client.js';
 import { DollarSign, CheckCircle, AlertCircle } from 'lucide-react';
 
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 export default function PaymentModal({ document, type = 'outbound', onClose, onSuccess }) {
   if (!document) return null;
 
@@ -28,10 +26,6 @@ export default function PaymentModal({ document, type = 'outbound', onClose, onS
     setLoading(true);
     setError(null);
     try {
-      if (!uuidPattern.test(document.id)) {
-        throw new Error('The selected bill has an invalid ID. Refresh the bills list and try again.');
-      }
-
       const paymentPayload = {
         direction: type,
         vendorBillId: type === 'outbound' ? document.id : null,
