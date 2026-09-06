@@ -221,9 +221,10 @@ export async function updateSalesOrder(id, { customerId, orderDate, lines }) {
 
 export async function getSalesOrderById(id) {
   const soRes = await pool.query(
-    `SELECT so.*, c.name as customer_name 
+    `SELECT so.*, c.name as customer_name, ci.id as invoice_id
      FROM sales_orders so 
      JOIN contacts c ON so.customer_id = c.id 
+     LEFT JOIN customer_invoices ci ON ci.sales_order_id = so.id
      WHERE so.id = $1`,
     [id]
   );
@@ -260,11 +261,7 @@ export async function getSalesOrderById(id) {
     };
   });
 
-  const totals = calculateOrderTotals(lines.map(l => ({
-    quantity: l.quantity,
-    unitPrice: l.unitPrice,
-    taxRatePercent: l.taxRatePercent
-  })));
+  const totals = calculateOrderTotals(lines);
 
   return {
     id: so.id,
@@ -273,10 +270,11 @@ export async function getSalesOrderById(id) {
     customerName: so.customer_name,
     status: so.status,
     orderDate: so.order_date,
+    invoiceId: so.invoice_id,
     createdBy: so.created_by,
     createdAt: so.created_at,
     ...totals,
-    lines,
+    lines
   };
 }
 

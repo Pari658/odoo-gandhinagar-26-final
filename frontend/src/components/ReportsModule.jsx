@@ -88,7 +88,106 @@ export default function ReportsModule() {
   };
 
   const handlePrint = () => {
-    window.print();
+    const escapeHtml = value => String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+
+    const amount = value => formatINR(value);
+    const table = (title, rows, amountLabel) => `
+      <section>
+        <h2>${escapeHtml(title)}</h2>
+        <table>
+          <thead><tr><th>Account</th><th>Debit</th><th>Credit</th><th>${escapeHtml(amountLabel)}</th></tr></thead>
+          <tbody>${rows.length ? rows.map(row => `
+            <tr>
+              <td>${escapeHtml(row.name)}</td>
+              <td>${amount(row.debit)}</td>
+              <td>${amount(row.credit)}</td>
+              <td>${amount(row.amount ?? row.balance)}</td>
+            </tr>`).join('') : '<tr><td colspan="4">No recorded transactions</td></tr>'}</tbody>
+        </table>
+      </section>`;
+
+    let reportTitle = 'Overall Financial Report';
+    let reportBody = '';
+
+    if (activeTab === 'profit_and_loss') {
+      reportTitle = 'Profit & Loss Statement';
+      reportBody = `
+        <div class="summary">
+          <div><strong>Total Sales</strong><span>${amount(pnlData?.salesRevenue?.total)}</span></div>
+          <div><strong>Direct Materials</strong><span>${amount(pnlData?.directPurchases?.total)}</span></div>
+          <div><strong>Gross Profit</strong><span>${amount(pnlData?.grossProfit?.amount)}</span></div>
+          <div><strong>Net Profit</strong><span>${amount(pnlData?.netProfit?.amount)}</span></div>
+        </div>
+        ${table('Sales Revenue', pnlData?.salesRevenue?.items || [], 'Net Sales')}
+        ${table('Direct Materials Cost', pnlData?.directPurchases?.items || [], 'Net Cost')}
+        ${table('Operating Expenses', pnlData?.operatingExpenses?.items || [], 'Net Expense')}`;
+    } else if (activeTab === 'balance_sheet') {
+      reportTitle = 'Balance Sheet Statement';
+      reportBody = `
+        <div class="summary">
+          <div><strong>Total Assets</strong><span>${amount(bsData?.assets?.total)}</span></div>
+          <div><strong>Total Liabilities</strong><span>${amount(bsData?.liabilities?.total)}</span></div>
+          <div><strong>Total Equity</strong><span>${amount(bsData?.equity?.total)}</span></div>
+          <div><strong>Liabilities + Equity</strong><span>${amount(bsData?.totalLiabilitiesAndEquity)}</span></div>
+        </div>
+        ${table('Assets', bsData?.assets?.items || [], 'Balance')}
+        ${table('Liabilities', bsData?.liabilities?.items || [], 'Balance')}
+        ${table('Equity & Capital', bsData?.equity?.items || [], 'Balance')}
+        <div class="total"><strong>Retained Earnings / Net Profit</strong><span>${amount(bsData?.equity?.retainedEarnings)}</span></div>`;
+    } else {
+      reportBody = `
+        <div class="summary">
+          <div><strong>Total Revenue</strong><span>${amount(overallData?.salesRevenue)}</span></div>
+          <div><strong>Direct Materials</strong><span>${amount(overallData?.directPurchases)}</span></div>
+          <div><strong>Operating Expenses</strong><span>${amount(overallData?.operatingExpenses)}</span></div>
+          <div><strong>Net Profit</strong><span>${amount(overallData?.netProfit)}</span></div>
+          <div><strong>Total Assets</strong><span>${amount(overallData?.totalAssets)}</span></div>
+          <div><strong>Total Equity</strong><span>${amount(overallData?.totalEquity)}</span></div>
+        </div>`;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      setError('Allow pop-ups to generate the report PDF.');
+      return;
+    }
+
+    const reportMarkup = `<!doctype html><html><head><title>${escapeHtml(reportTitle)}</title>
+      <style>
+        @page { size: A4; margin: 16mm; }
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; color: #2c221e; margin: 0; font-size: 12px; }
+        header { border-bottom: 2px solid #b45309; padding-bottom: 12px; margin-bottom: 18px; }
+        h1 { margin: 0 0 5px; font-size: 24px; }
+        h2 { font-size: 15px; margin: 22px 0 8px; border-bottom: 1px solid #e6dfd5; padding-bottom: 6px; }
+        .meta { color: #6b5e55; font-size: 11px; }
+        .summary { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 14px 0 20px; }
+        .summary div, .total { display: flex; justify-content: space-between; gap: 12px; padding: 10px; border: 1px solid #e6dfd5; background: #faf6ee; }
+        .summary span, .total span { font-family: monospace; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+        th, td { border: 1px solid #e6dfd5; padding: 7px 8px; text-align: right; }
+        th:first-child, td:first-child { text-align: left; }
+        th { background: #f3ece0; }
+        section { break-inside: avoid; }
+        footer { margin-top: 24px; color: #6b5e55; font-size: 10px; }
+      </style></head><body>
+      <header><h1>Urban Furniture</h1><div class="meta">${escapeHtml(reportTitle)} | Generated ${escapeHtml(new Date().toLocaleString())}</div></header>
+      ${reportBody}
+      <footer>Source: Live Backend Ledger</footer>
+      </body></html>`;
+
+    printWindow.addEventListener('load', () => {
+      printWindow.focus();
+      printWindow.print();
+    }, { once: true });
+    printWindow.document.open();
+    printWindow.document.write(reportMarkup);
+    printWindow.document.close();
   };
 
   if (!isStaff) {
