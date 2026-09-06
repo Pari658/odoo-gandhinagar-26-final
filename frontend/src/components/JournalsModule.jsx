@@ -15,6 +15,7 @@ export default function JournalsModule() {
   // Modal & Selection State
   const [showModal, setShowModal] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
+  const [journalDetail, setJournalDetail] = useState(null);
   const [editData, setEditData] = useState(null);
   
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -88,6 +89,18 @@ export default function JournalsModule() {
     setShowModal(true);
   };
 
+  const openJournalDetail = async (id) => {
+    setSelectedId(id);
+    setJournalDetail(null);
+    setView('detail');
+    try {
+      const detail = await apiRequest('GET', `/journals/${id}`);
+      setJournalDetail(detail);
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'Failed to load journal entries' });
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -123,7 +136,7 @@ export default function JournalsModule() {
       {view === 'detail' ? (
         <>
           <JournalDetail 
-            journal={journals.find(j => j.id === selectedId)}
+            journal={journalDetail || journals.find(j => j.id === selectedId)}
             accounts={accounts}
             onBack={() => setView('list')}
             onEdit={isPrivileged ? handleEdit : null}
@@ -254,10 +267,7 @@ export default function JournalsModule() {
                 return (
                   <div 
                     key={j.id} 
-                    onClick={() => {
-                      setSelectedId(j.id);
-                      setView('detail');
-                    }}
+                    onClick={() => openJournalDetail(j.id)}
                     className="p-5 rounded-xl bg-white dark:bg-[#1C1613] border border-[#E6DFD5] dark:border-[#382D27] shadow-sm space-y-3 hover:border-[#B45309]/50 transition-all group cursor-pointer"
                   >
                     <div className="flex items-center justify-between">
