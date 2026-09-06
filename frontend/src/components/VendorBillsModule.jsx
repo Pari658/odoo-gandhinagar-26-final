@@ -265,7 +265,7 @@ export default function VendorBillsModule() {
                   {bill.state === 'posted' && (
                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border uppercase ${
                       bill.paymentStatus === 'paid' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-                      bill.paymentStatus === 'partial' ? 'bg-blue-50 text-blue-800 border-blue-200' :
+                      bill.paymentStatus === 'partially_paid' ? 'bg-blue-50 text-blue-800 border-blue-200' :
                       'bg-gray-50 text-gray-800 border-gray-200'
                     }`}>
                       {bill.paymentStatus}
@@ -305,7 +305,7 @@ export default function VendorBillsModule() {
                     Confirm Bill
                   </button>
                 )}
-                {bill.state === 'posted' && bill.paymentStatus !== 'paid' && ['admin', 'accountant'].includes(user?.role) && (
+                {bill.state === 'posted' && Number(bill.amountDue) > 0 && ['admin', 'accountant'].includes(user?.role) && (
                   <button
                     onClick={() => openPaymentModal(bill)}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-[#B45309] text-white hover:bg-[#92400E] rounded-lg text-xs font-semibold transition-colors cursor-pointer"

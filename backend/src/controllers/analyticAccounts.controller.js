@@ -105,6 +105,7 @@ export async function getAnalyticBudgets(req, res) {
     return res.status(500).json({ success: false, data: null, error: { message: 'Server error' } });
   }
 }
+
 export async function deleteAnalyticAccount(req, res) {
   try {
     const { id } = req.params;
@@ -135,26 +136,6 @@ export async function deleteAnalyticAccount(req, res) {
       error: {
         code: 'DB_ERROR',
         message: 'Failed to delete analytic account'
-      }
-    });
-  }
-}
-      [name, type]
-    );
-
-    return res.status(201).json({
-      success: true,
-      data: result.rows[0],
-      error: null
-    });
-  } catch (error) {
-    console.error('Error creating analytic account:', error);
-    return res.status(500).json({
-      success: false,
-      data: null,
-      error: {
-        code: 'DB_ERROR',
-        message: 'Failed to create analytic account'
       }
     });
   }
