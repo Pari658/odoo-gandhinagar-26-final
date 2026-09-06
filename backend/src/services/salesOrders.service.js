@@ -1,5 +1,6 @@
 import pool from '../config/supabase.js';
 import { generateSONumber, calculateLineTotals, calculateOrderTotals } from '../lib/salesHelpers.js';
+import { createJournalEntry } from './ledger.service.js';
 
 export async function createSalesOrder({ customerId, orderDate, lines, createdBy }) {
   const client = await pool.connect();
@@ -107,19 +108,24 @@ export async function createSalesOrder({ customerId, orderDate, lines, createdBy
   }
 }
 
-export async function getSalesOrders({ page = 1, pageSize = 10, search = '' } = {}) {
+export async function getSalesOrders({ page = 1, pageSize = 10, search = '', userRole = 'admin', contactId = null } = {}) {
   const limit = parseInt(pageSize, 10) || 10;
   const offset = (page - 1) * limit;
 
-  let whereClause = '';
-  const paramsCount = [];
-  const paramsSelect = [limit, offset];
+  let whereConditions = [];
+  const params = [];
+
+  if (userRole === 'contact' && contactId) {
+    params.push(contactId);
+    whereConditions.push(`so.customer_id = $${params.length}`);
+  }
 
   if (search) {
-    whereClause = 'WHERE so.number ILIKE $1 OR c.name ILIKE $1';
-    paramsCount.push(`%${search}%`);
-    paramsSelect.push(`%${search}%`);
+    params.push(`%${search}%`);
+    whereConditions.push(`(so.number ILIKE $${params.length} OR c.name ILIKE $${params.length})`);
   }
+
+  const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
   const countQuery = `
     SELECT COUNT(*) 
@@ -127,21 +133,22 @@ export async function getSalesOrders({ page = 1, pageSize = 10, search = '' } = 
     JOIN contacts c ON so.customer_id = c.id
     ${whereClause}
   `;
-  const countRes = await pool.query(countQuery, paramsCount);
+  const countRes = await pool.query(countQuery, params);
   const totalCount = parseInt(countRes.rows[0].count, 10);
 
-  // If search is used, it's parameter $3
+  // For selectQuery, we need to append limit and offset to the params array
+  const selectParams = [...params, limit, offset];
   const selectQuery = `
     SELECT so.*, c.name as customer_name 
     FROM sales_orders so 
     JOIN contacts c ON so.customer_id = c.id 
-    ${whereClause.replace(/\$1/g, '$3')}
+    ${whereClause}
     ORDER BY so.created_at DESC 
-    LIMIT $1 OFFSET $2
+    LIMIT $${selectParams.length - 1} OFFSET $${selectParams.length}
   `;
-  const soRes = await pool.query(selectQuery, paramsSelect);
+  const res = await pool.query(selectQuery, selectParams);
 
-  const items = soRes.rows.map(so => ({
+  const items = res.rows.map(so => ({
     id: so.id,
     number: so.number,
     customerId: so.customer_id,
@@ -292,6 +299,118 @@ export async function confirmSalesOrder(id) {
     
     await client.query('COMMIT');
     
+    return getSalesOrderById(id);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    if (err.status) throw err;
+    throw { status: 500, code: 'SERVER_ERROR', message: err.message };
+  } finally {
+    client.release();
+  }
+}
+
+export async function invoiceSalesOrder(id) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    // Fetch full sales order details
+    const soRes = await client.query('SELECT * FROM sales_orders WHERE id = $1 FOR UPDATE', [id]);
+    if (soRes.rows.length === 0) {
+      throw { status: 404, code: 'NOT_FOUND', message: 'Sales order not found' };
+    }
+    
+    const so = soRes.rows[0];
+    if (so.status !== 'confirmed' && so.status !== 'draft') {
+      throw { status: 409, code: 'CONFLICT', message: `Cannot invoice sales order with status '${so.status}'. Must be confirmed.` };
+    }
+
+    // Fetch lines
+    const linesRes = await client.query(`
+      SELECT sol.*, t.rate_percent as tax_rate_percent 
+      FROM sales_order_lines sol
+      LEFT JOIN tax_rates t ON sol.tax_rate_id = t.id
+      WHERE sol.sales_order_id = $1
+    `, [id]);
+
+    if (linesRes.rows.length === 0) {
+      throw { status: 400, code: 'VALIDATION_ERROR', message: 'Sales order has no lines to invoice' };
+    }
+
+    // Calculate totals
+    let subtotal = 0;
+    let totalTax = 0;
+    for (const l of linesRes.rows) {
+      const lineTotal = Number(l.quantity) * Number(l.unit_price);
+      subtotal += lineTotal;
+      const taxAmount = lineTotal * (Number(l.tax_rate_percent || 0) / 100);
+      totalTax += taxAmount;
+    }
+    const grandTotal = subtotal + totalTax;
+
+    // Generate Invoice Number
+    const countRes = await client.query('SELECT COUNT(*) FROM customer_invoices');
+    const invCount = Number(countRes.rows[0].count) + 1;
+    const invNumber = `INV/${new Date().getFullYear()}/${invCount.toString().padStart(4, '0')}`;
+
+    const invoiceDate = new Date().toISOString().split('T')[0];
+    const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    // Insert into customer_invoices
+    const invRes = await client.query(`
+      INSERT INTO customer_invoices (number, sales_order_id, customer_id, invoice_date, due_date, total_amount, amount_paid, status, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, 0, 'unpaid', NOW())
+      RETURNING *
+    `, [invNumber, so.id, so.customer_id, invoiceDate, dueDate, grandTotal]);
+
+    const customerInvoice = invRes.rows[0];
+
+    // Fetch Sales Journal details for revenue posting & line account
+    const salesJournalRes = await client.query(`SELECT id, default_debit_account_id, default_credit_account_id FROM journals WHERE type = 'sales' LIMIT 1`);
+    const sj = salesJournalRes.rows[0] || {};
+    const debtorsAccountId = sj.default_debit_account_id || '40000000-0000-0000-0000-000000000003';
+    const salesAccountId = sj.default_credit_account_id || '40000000-0000-0000-0000-000000000006';
+
+    // Insert invoice lines into customer_invoice_lines
+    for (const l of linesRes.rows) {
+      await client.query(`
+        INSERT INTO customer_invoice_lines (customer_invoice_id, product_id, account_id, analytic_account_id, quantity, unit_price, tax_rate_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `, [
+        customerInvoice.id,
+        l.product_id,
+        salesAccountId,
+        l.analytic_account_id || null,
+        l.quantity,
+        l.unit_price,
+        l.tax_rate_id || null
+      ]);
+    }
+
+    // Create Revenue Journal Entry in ledger
+    if (sj.id) {
+      const jeLines = [
+        { accountId: debtorsAccountId, partnerId: so.customer_id, debit: grandTotal, credit: 0 },
+        { accountId: salesAccountId, partnerId: so.customer_id, debit: 0, credit: grandTotal }
+      ];
+
+      const je = await createJournalEntry(client, {
+        entryDate: invoiceDate,
+        journalId: sj.id,
+        status: 'posted',
+        lines: jeLines,
+        sourceType: 'customer_invoice',
+        sourceId: customerInvoice.id
+      });
+
+      await client.query('UPDATE customer_invoices SET journal_entry_id = $1 WHERE id = $2', [je.id, customerInvoice.id]);
+    }
+
+    // Update Sales Order status to 'invoiced'
+    await client.query('UPDATE sales_orders SET status = $1 WHERE id = $2', ['invoiced', id]);
+
+    await client.query('COMMIT');
+
     return getSalesOrderById(id);
   } catch (err) {
     await client.query('ROLLBACK');

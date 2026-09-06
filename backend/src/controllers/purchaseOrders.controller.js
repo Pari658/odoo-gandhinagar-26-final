@@ -1,5 +1,70 @@
 import { pool } from '../config/supabase.js';
 
+export const getPurchaseOrderById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const query = `
+      SELECT po.*, c.name as vendor_name, c.email as vendor_email
+      FROM purchase_orders po
+      JOIN contacts c ON po.vendor_id = c.id
+      WHERE po.id = $1
+    `;
+    const poResult = await pool.query(query, [id]);
+
+    if (poResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'Purchase order not found' }
+      });
+    }
+
+    const po = poResult.rows[0];
+
+    const linesQuery = `
+      SELECT pol.*, p.name as product_name
+      FROM purchase_order_lines pol
+      JOIN products p ON pol.product_id = p.id
+      WHERE pol.purchase_order_id = $1
+    `;
+    const linesResult = await pool.query(linesQuery, [id]);
+
+    let total = 0;
+    const lines = linesResult.rows.map(line => {
+      const lineTotal = line.quantity * line.unit_price;
+      total += lineTotal;
+      return {
+        id: line.id,
+        productId: line.product_id,
+        productName: line.product_name,
+        analyticAccountId: line.analytic_account_id,
+        quantity: line.quantity,
+        unitPrice: Number(line.unit_price),
+        total: lineTotal
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        id: po.id,
+        number: po.number,
+        vendorId: po.vendor_id,
+        vendorName: po.vendor_name,
+        vendorEmail: po.vendor_email,
+        status: po.status,
+        orderDate: po.order_date,
+        total,
+        lines
+      },
+      error: null
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const getPurchaseOrders = async (req, res, next) => {
   try {
     const { page = 1, limit = 20, search } = req.query;

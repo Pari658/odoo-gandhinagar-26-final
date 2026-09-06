@@ -4,6 +4,7 @@ import {
   getSalesOrderById,
   confirmSalesOrder,
   updateSalesOrder,
+  invoiceSalesOrder,
 } from '../services/salesOrders.service.js';
 
 /**
@@ -90,8 +91,11 @@ export async function handleGetSalesOrders(req, res) {
     const page = parseInt(req.query.page, 10) || 1;
     const pageSize = parseInt(req.query.pageSize, 10) || 10;
     const search = req.query.search || '';
+    
+    const userRole = req.user?.role;
+    const contactId = req.user?.contactId;
 
-    const result = await getSalesOrders({ page, pageSize, search });
+    const result = await getSalesOrders({ page, pageSize, search, userRole, contactId });
 
     res.json({ success: true, data: result, error: null });
   } catch (err) {
@@ -174,3 +178,22 @@ export async function handleConfirmSalesOrder(req, res) {
     });
   }
 }
+
+/**
+ * POST /api/v1/sales-orders/:id/invoice
+ */
+export async function handleInvoiceSalesOrder(req, res) {
+  try {
+    const result = await invoiceSalesOrder(req.params.id);
+
+    res.json({ success: true, data: result, error: null });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      data: null,
+      error: { code: err.code || 'SERVER_ERROR', message: err.message },
+    });
+  }
+}
+

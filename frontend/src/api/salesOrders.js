@@ -39,3 +39,11 @@ export async function updateSalesOrder(id, data) {
 export async function confirmSalesOrder(id) {
   return apiRequest('POST', `/sales-orders/${id}/confirm`);
 }
+
+/**
+ * Invoice a confirmed Sales Order
+ */
+export async function invoiceSalesOrder(id) {
+  return apiRequest('POST', `/sales-orders/${id}/invoice`);
+}
+

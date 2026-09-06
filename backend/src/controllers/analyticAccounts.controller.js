@@ -3,7 +3,7 @@ import { pool } from '../config/supabase.js';
 export async function getAnalyticAccounts(req, res) {
   const { type } = req.query;
 
-  try {   
+  try {
     let query = 'SELECT id, name, type FROM analytic_accounts';
     const params = [];
     
@@ -34,6 +34,44 @@ export async function getAnalyticAccounts(req, res) {
   }
 }
 
+export async function getAnalyticAccountById(req, res) {
+  const { id } = req.params;
+
+  try {
+    const result = await pool.query(
+      'SELECT id, name, type FROM analytic_accounts WHERE id = $1',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: {
+          code: 'NOT_FOUND',
+          message: 'Analytic account not found'
+        }
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: result.rows[0],
+      error: null
+    });
+  } catch (error) {
+    console.error('Error fetching analytic account by id:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: {
+        code: 'DB_ERROR',
+        message: 'Failed to fetch analytic account'
+      }
+    });
+  }
+}
+
 export async function createAnalyticAccount(req, res) {
   const { name, type } = req.body;
 
@@ -52,7 +90,7 @@ export async function createAnalyticAccount(req, res) {
   try {
     const result = await pool.query(
       'INSERT INTO analytic_accounts (name, type) VALUES ($1, $2) RETURNING id, name, type',
-      [name, type]
+      [name.trim(), type]
     );
 
     return res.status(201).json({
@@ -73,44 +111,26 @@ export async function createAnalyticAccount(req, res) {
   }
 }
 
-export async function getAnalyticBudgets(req, res) {
+export async function updateAnalyticAccount(req, res) {
   const { id } = req.params;
+  const { name, type } = req.body;
 
-  try {
-    // For now, return the mock data if budgets table is not fully populated/implemented.
-    // If you have a budget table, you could query it here. We'll use a placeholder for now
-    // based on the previous mock data since the user didn't mention migrating budgets specifically.
-    return res.json({
-      success: true,
-      data: {
-        items: [
-          {
-            id: `b-${id}-01`,
-            name: `Budget for ${id}`,
-            periodStart: '2026-01-01',
-            periodEnd: '2026-12-31',
-            committedAmount: 250000.00,
-            achievedAmount: 48920.00,
-            achievedPercent: 19.57,
-            amountToAchieve: 201080.00
-          }
-        ],
-        page: 1,
-        pageSize: 20,
-        totalCount: 1
-      },
-      error: null
+  if (!name || !type) {
+    return res.status(400).json({
+      success: false,
+      data: null,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Name and type are required for update'
+      }
     });
-  } catch (error) {
-    return res.status(500).json({ success: false, data: null, error: { message: 'Server error' } });
   }
-}
 
-export async function deleteAnalyticAccount(req, res) {
   try {
-    const { id } = req.params;
-
-    const result = await pool.query('DELETE FROM analytic_accounts WHERE id = $1 RETURNING id', [id]);
+    const result = await pool.query(
+      'UPDATE analytic_accounts SET name = $1, type = $2 WHERE id = $3 RETURNING id, name, type',
+      [name.trim(), type, id]
+    );
 
     if (result.rowCount === 0) {
       return res.status(404).json({
@@ -129,14 +149,91 @@ export async function deleteAnalyticAccount(req, res) {
       error: null
     });
   } catch (error) {
+    console.error('Error updating analytic account:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: {
+        code: 'DB_ERROR',
+        message: 'Failed to update analytic account'
+      }
+    });
+  }
+}
+
+export async function deleteAnalyticAccount(req, res) {
+  const { id } = req.params;
+
+  try {
+    const result = await pool.query(
+      'DELETE FROM analytic_accounts WHERE id = $1 RETURNING id',
+      [id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: {
+          code: 'NOT_FOUND',
+          message: 'Analytic account not found'
+        }
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: { id, message: 'Analytic account deleted successfully' },
+      error: null
+    });
+  } catch (error) {
     console.error('Error deleting analytic account:', error);
     return res.status(500).json({
       success: false,
       data: null,
       error: {
         code: 'DB_ERROR',
-        message: 'Failed to delete analytic account'
+        message: error.message || 'Failed to delete analytic account'
       }
+    });
+  }
+}
+
+export async function getAnalyticBudgets(req, res) {
+  const { id } = req.params;
+
+  try {
+    const result = await pool.query(`
+      SELECT 
+        bp.budget_id AS id,
+        bp.budget_name AS name,
+        bp.period_start AS "periodStart",
+        bp.period_end AS "periodEnd",
+        bp.committed_amount::numeric(14,2) AS "committedAmount",
+        bp.achieved_amount::numeric(14,2) AS "achievedAmount",
+        bp.achieved_percent::numeric(5,2) AS "achievedPercent",
+        bp.amount_to_achieve::numeric(14,2) AS "amountToAchieve"
+      FROM v_budget_progress bp
+      WHERE bp.analytic_account_id = $1
+      ORDER BY bp.period_start DESC
+    `, [id]);
+
+    return res.json({
+      success: true,
+      data: {
+        items: result.rows,
+        page: 1,
+        pageSize: 20,
+        totalCount: result.rows.length
+      },
+      error: null
+    });
+  } catch (error) {
+    console.error('Error fetching analytic budgets:', error);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: { message: error.message || 'Server error' }
     });
   }
 }
