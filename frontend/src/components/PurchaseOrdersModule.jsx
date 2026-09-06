@@ -155,7 +155,14 @@ export default function PurchaseOrdersModule() {
 
   const handleCreateBill = async (id) => {
     try {
-      const bill = await apiRequest('POST', `/purchase-orders/${id}/create-bill`, { billDate: new Date().toISOString().split('T')[0] });
+      const billDate = new Date();
+      const dueDate = new Date(billDate);
+      dueDate.setDate(dueDate.getDate() + 30);
+      const formatDate = date => date.toISOString().split('T')[0];
+      const bill = await apiRequest('POST', `/purchase-orders/${id}/create-bill`, {
+        billDate: formatDate(billDate),
+        dueDate: formatDate(dueDate)
+      });
       setMessage({ type: 'success', text: `Vendor Bill created successfully from PO!` });
       if (view === 'detail') {
         loadPODetail(id);
