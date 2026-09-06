@@ -22,6 +22,7 @@ export default function VendorBillsModule() {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentBill, setPaymentBill] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   
   const [message, setMessage] = useState(null);
@@ -210,6 +211,7 @@ export default function VendorBillsModule() {
   const openPaymentModal = (bill) => {
     if (bill && bill.id) {
       setSelectedBillId(bill.id);
+      setPaymentBill(bill);
     }
     setShowPaymentModal(true);
   };
@@ -220,9 +222,9 @@ export default function VendorBillsModule() {
     bill.billReference?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const currentBillForPayment = (billDetail && selectedBillId && billDetail.id === selectedBillId)
+  const currentBillForPayment = paymentBill || ((billDetail && selectedBillId && billDetail.id === selectedBillId)
     ? billDetail
-    : vendorBills.find(b => b.id === selectedBillId);
+    : vendorBills.find(b => b.id === selectedBillId));
 
   const billDocument = currentBillForPayment ? {
     id: currentBillForPayment.id,

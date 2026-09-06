@@ -28,7 +28,6 @@ export default function PaymentModal({ document, type = 'outbound', onClose, onS
     try {
       const paymentPayload = {
         direction: type,
-        partnerId: type === 'outbound' ? document.vendorId : document.customerId,
         vendorBillId: type === 'outbound' ? document.id : null,
         customerInvoiceId: type === 'inbound' ? document.id : null,
         amount: Number(paymentData.amount),

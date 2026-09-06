@@ -1,6 +1,9 @@
 import { z } from 'zod';
 
-const uuid = z.string().uuid('Must be a valid UUID');
+const uuid = z.string().regex(
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+  'Must be a valid UUID'
+);
 const paymentDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Payment date must be YYYY-MM-DD');
 
 export const paymentSchema = {
