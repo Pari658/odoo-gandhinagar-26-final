@@ -63,6 +63,7 @@ async function setup() {
           JOIN vendor_bills vb ON vb.id = vbl.vendor_bill_id
           WHERE aa.type = 'expense'
             AND vbl.analytic_account_id = aa.id
+            AND vb.journal_entry_id IS NOT NULL
             AND vb.invoice_date BETWEEN b.period_start AND b.period_end
       ) achieved ON TRUE;
     `);

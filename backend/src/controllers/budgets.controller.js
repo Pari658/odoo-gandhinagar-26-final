@@ -1,5 +1,53 @@
 import { query } from '../db/index.js';
 
+const budgetProgressSource = `
+  budgets b
+  JOIN analytic_accounts aa ON aa.id = b.analytic_account_id
+  LEFT JOIN contacts rc ON rc.id = b.responsible_contact_id
+  LEFT JOIN budgets rb ON rb.id = b.revision_of_id
+  LEFT JOIN LATERAL (
+    SELECT SUM(amount) AS achieved_amount
+    FROM (
+      SELECT SUM(cil.quantity * cil.unit_price) AS amount
+      FROM customer_invoice_lines cil
+      JOIN customer_invoices ci ON ci.id = cil.customer_invoice_id
+      WHERE aa.type = 'income'
+        AND cil.analytic_account_id = aa.id
+        AND ci.journal_entry_id IS NOT NULL
+        AND ci.invoice_date BETWEEN b.period_start AND b.period_end
+      UNION ALL
+      SELECT SUM(vbl.quantity * vbl.unit_price) AS amount
+      FROM vendor_bill_lines vbl
+      JOIN vendor_bills vb ON vb.id = vbl.vendor_bill_id
+      WHERE aa.type = 'expense'
+        AND vbl.analytic_account_id = aa.id
+        AND vb.journal_entry_id IS NOT NULL
+        AND vb.invoice_date BETWEEN b.period_start AND b.period_end
+    ) achieved_rows
+  ) achieved ON TRUE
+`;
+
+const budgetProgressColumns = `
+  b.id AS budget_id,
+  b.name AS budget_name,
+  aa.id AS analytic_account_id,
+  aa.name AS analytic_name,
+  aa.type AS analytic_type,
+  b.period_start,
+  b.period_end,
+  b.committed_amount::numeric(14,2) AS committed_amount,
+  COALESCE(achieved.achieved_amount, 0)::numeric(14,2) AS achieved_amount,
+  CASE WHEN b.committed_amount > 0
+    THEN ROUND(COALESCE(achieved.achieved_amount, 0) / b.committed_amount * 100, 2)
+    ELSE 0 END AS achieved_percent,
+  (b.committed_amount - COALESCE(achieved.achieved_amount, 0))::numeric(14,2) AS amount_to_achieve,
+  b.status,
+  b.responsible_contact_id,
+  b.revision_of_id,
+  rb.name AS revision_of_name,
+  rc.name AS responsible_contact_name
+`;
+
 /**
  * Format a row from v_budget_progress into an API response object
  */
@@ -62,25 +110,9 @@ function mapBudgetRow(b) {
 export async function getBudgets(req, res) {
   try {
     const sql = `
-      SELECT 
-        bp.budget_id,
-        bp.budget_name,
-        bp.analytic_account_id,
-        bp.analytic_name,
-        bp.analytic_type,
-        bp.period_start,
-        bp.period_end,
-        bp.committed_amount::numeric(14,2) AS committed_amount,
-        bp.achieved_amount::numeric(14,2) AS achieved_amount,
-        bp.achieved_percent::numeric(5,2) AS achieved_percent,
-        bp.amount_to_achieve::numeric(14,2) AS amount_to_achieve,
-        bp.status,
-        bp.responsible_contact_id,
-        bp.revision_of_id,
-        bp.revision_of_name,
-        bp.responsible_contact_name
-      FROM v_budget_progress bp
-      ORDER BY bp.period_start DESC, bp.budget_name ASC;
+      SELECT ${budgetProgressColumns}
+      FROM ${budgetProgressSource}
+      ORDER BY b.period_start DESC, b.name ASC;
     `;
 
     const result = await query(sql);
@@ -135,25 +167,9 @@ export async function getBudgetById(req, res) {
   try {
     const { id } = req.params;
     const sql = `
-      SELECT 
-        bp.budget_id,
-        bp.budget_name,
-        bp.analytic_account_id,
-        bp.analytic_name,
-        bp.analytic_type,
-        bp.period_start,
-        bp.period_end,
-        bp.committed_amount::numeric(14,2) AS committed_amount,
-        bp.achieved_amount::numeric(14,2) AS achieved_amount,
-        bp.achieved_percent::numeric(5,2) AS achieved_percent,
-        bp.amount_to_achieve::numeric(14,2) AS amount_to_achieve,
-        bp.status,
-        bp.responsible_contact_id,
-        bp.revision_of_id,
-        bp.revision_of_name,
-        bp.responsible_contact_name
-      FROM v_budget_progress bp
-      WHERE bp.budget_id = $1
+      SELECT ${budgetProgressColumns}
+      FROM ${budgetProgressSource}
+      WHERE b.id = $1
       LIMIT 1;
     `;
 
