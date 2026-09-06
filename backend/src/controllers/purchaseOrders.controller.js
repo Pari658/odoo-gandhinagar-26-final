@@ -5,7 +5,10 @@ export const getPurchaseOrderById = async (req, res, next) => {
     const { id } = req.params;
 
     const query = `
-      SELECT po.*, c.name as vendor_name, c.email as vendor_email
+      SELECT po.*, c.name as vendor_name, c.email as vendor_email,
+             CASE WHEN EXISTS (
+               SELECT 1 FROM vendor_bills vb WHERE vb.purchase_order_id = po.id
+             ) THEN 'done' ELSE po.status::text END AS display_status
       FROM purchase_orders po
       JOIN contacts c ON po.vendor_id = c.id
       WHERE po.id = $1
@@ -53,7 +56,7 @@ export const getPurchaseOrderById = async (req, res, next) => {
         vendorId: po.vendor_id,
         vendorName: po.vendor_name,
         vendorEmail: po.vendor_email,
-        status: po.status,
+        status: po.display_status,
         orderDate: po.order_date,
         total,
         lines
@@ -72,7 +75,10 @@ export const getPurchaseOrders = async (req, res, next) => {
 
     let query = `
       SELECT po.*, c.name as vendor_name,
-      (SELECT SUM(quantity * unit_price) FROM purchase_order_lines WHERE purchase_order_id = po.id) as total
+      (SELECT SUM(quantity * unit_price) FROM purchase_order_lines WHERE purchase_order_id = po.id) as total,
+      CASE WHEN EXISTS (
+        SELECT 1 FROM vendor_bills vb WHERE vb.purchase_order_id = po.id
+      ) THEN 'done' ELSE po.status::text END AS display_status
       FROM purchase_orders po
       JOIN contacts c ON po.vendor_id = c.id
       ORDER BY po.created_at DESC
@@ -90,7 +96,7 @@ export const getPurchaseOrders = async (req, res, next) => {
       number: row.number,
       vendorId: row.vendor_id,
       vendorName: row.vendor_name,
-      status: row.status,
+      status: row.display_status,
       orderDate: row.order_date,
       total: Number(row.total) || 0
     }));
