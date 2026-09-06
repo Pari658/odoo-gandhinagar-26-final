@@ -248,3 +248,100 @@ export async function deleteJournal(req, res) {
     });
   }
 }
+
+export async function getJournalById(req, res) {
+  try {
+    const journalResult = await query(`
+      SELECT
+        j.id,
+        j.name,
+        j.type,
+        j.default_debit_account_id AS "defaultDebitAccountId",
+        da.name AS "defaultDebitAccountName",
+        j.default_credit_account_id AS "defaultCreditAccountId",
+        ca.name AS "defaultCreditAccountName",
+        j.created_at AS "createdAt"
+      FROM journals j
+      LEFT JOIN chart_of_accounts da ON da.id = j.default_debit_account_id
+      LEFT JOIN chart_of_accounts ca ON ca.id = j.default_credit_account_id
+      WHERE j.id = $1
+    `, [req.params.id]);
+
+    if (journalResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'Journal not found' }
+      });
+    }
+
+    const entriesResult = await query(`
+      SELECT
+        je.id,
+        je.number,
+        je.entry_date AS "entryDate",
+        je.reference,
+        je.status,
+        je.source_type AS "sourceType",
+        je.source_id AS "sourceId",
+        je.created_at AS "createdAt",
+        jel.id AS "lineId",
+        jel.account_id AS "accountId",
+        coa.name AS "accountName",
+        jel.partner_id AS "partnerId",
+        c.name AS "partnerName",
+        jel.debit,
+        jel.credit
+      FROM journal_entries je
+      LEFT JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id
+      LEFT JOIN chart_of_accounts coa ON coa.id = jel.account_id
+      LEFT JOIN contacts c ON c.id = jel.partner_id
+      WHERE je.journal_id = $1
+      ORDER BY je.entry_date DESC, je.created_at DESC, jel.id
+    `, [req.params.id]);
+
+    const entries = [];
+    for (const row of entriesResult.rows) {
+      let entry = entries.find(item => item.id === row.id);
+      if (!entry) {
+        entry = {
+          id: row.id,
+          number: row.number,
+          entryDate: row.entryDate,
+          reference: row.reference,
+          status: row.status,
+          sourceType: row.sourceType,
+          sourceId: row.sourceId,
+          createdAt: row.createdAt,
+          lines: []
+        };
+        entries.push(entry);
+      }
+
+      if (row.lineId) {
+        entry.lines.push({
+          id: row.lineId,
+          accountId: row.accountId,
+          accountName: row.accountName,
+          partnerId: row.partnerId,
+          partnerName: row.partnerName,
+          debit: Number(row.debit) || 0,
+          credit: Number(row.credit) || 0
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: { ...journalResult.rows[0], entries },
+      error: null
+    });
+  } catch (err) {
+    console.error('Error fetching journal detail:', err.message);
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: { code: 'DB_ERROR', message: 'Failed to fetch journal detail' }
+    });
+  }
+}

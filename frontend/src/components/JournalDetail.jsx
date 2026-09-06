@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookMarked, ArrowLeft, Edit2, Trash2, ArrowRightLeft, Database } from 'lucide-react';
+import { BookMarked, ArrowLeft, Edit2, Trash2, ArrowRightLeft, Database, FileText } from 'lucide-react';
 
 export default function JournalDetail({ journal, accounts, onBack, onEdit, onDelete }) {
   if (!journal) {
@@ -125,6 +125,59 @@ export default function JournalDetail({ journal, accounts, onBack, onEdit, onDel
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="border-t border-[#E6DFD5] dark:border-[#382D27] p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-bold text-[#6B5E55] dark:text-[#A89B91] uppercase tracking-wider flex items-center gap-2">
+            <FileText className="w-4 h-4 text-[#B45309]" />
+            Journal Entries
+          </h3>
+          <span className="text-xs text-[#8C7E74]">{journal.entries?.length || 0} entries</span>
+        </div>
+
+        {journal.entries?.length ? (
+          <div className="space-y-3">
+            {journal.entries.map(entry => (
+              <div key={entry.id} className="rounded-xl border border-[#E6DFD5] dark:border-[#382D27] overflow-hidden">
+                <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-[#FAF6EE] dark:bg-[#29211D] text-xs">
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold text-[#2C221E] dark:text-[#F5EFE6]">{entry.number}</span>
+                    <span className="text-[#6B5E55]">{entry.entryDate}</span>
+                    <span className="px-2 py-0.5 rounded-full border text-[10px] uppercase font-semibold">{entry.status}</span>
+                  </div>
+                  <span className="text-[#8C7E74]">{entry.sourceType || 'manual entry'}</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="text-[#8C7E74] border-t border-[#E6DFD5]/60 dark:border-[#382D27]">
+                      <tr>
+                        <th className="px-4 py-2 font-medium">Account</th>
+                        <th className="px-4 py-2 font-medium">Partner</th>
+                        <th className="px-4 py-2 font-medium text-right">Debit</th>
+                        <th className="px-4 py-2 font-medium text-right">Credit</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E6DFD5]/50 dark:divide-[#382D27]">
+                      {entry.lines.map(line => (
+                        <tr key={line.id}>
+                          <td className="px-4 py-2 text-[#2C221E] dark:text-[#F5EFE6]">{line.accountName || line.accountId}</td>
+                          <td className="px-4 py-2 text-[#6B5E55]">{line.partnerName || '-'}</td>
+                          <td className="px-4 py-2 text-right font-mono">{Number(line.debit).toFixed(2)}</td>
+                          <td className="px-4 py-2 text-right font-mono">{Number(line.credit).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="py-8 text-center text-xs text-[#8C7E74] border border-dashed border-[#E6DFD5] dark:border-[#382D27] rounded-xl">
+            No journal entries recorded for this journal.
+          </div>
+        )}
       </div>
     </div>
   );

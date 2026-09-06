@@ -28,7 +28,8 @@ import {
   LayoutDashboard,
   ShoppingCart,
   FileText,
-  CreditCard
+  CreditCard,
+  WalletCards
 } from 'lucide-react';
 
 export default function App() {
@@ -81,6 +82,7 @@ export default function App() {
     { id: 'journals', label: 'Journals Master', icon: BookMarked },
     { id: 'tax-rates', label: 'Tax Rates', icon: Percent },
     { id: 'analytic-accounts', label: 'Analytic Accounts', icon: PieChart },
+    { id: 'budgets', label: 'Budgets', icon: WalletCards },
     { id: 'vendor-bills', label: 'Vendor Bills', icon: FileText },
     { id: 'payments', label: 'Payments', icon: CreditCard },
     { id: 'reports', label: 'Reports & Statements', icon: Scale }
@@ -105,10 +107,12 @@ export default function App() {
           {activeTab === 'journals' && <JournalsModule />}
           {activeTab === 'tax-rates' && <TaxRatesModule />}
           {activeTab === 'analytic-accounts' && <AnalyticAccountsModule />}
+          {activeTab === 'budgets' && <BudgetModule />}
           {activeTab === 'purchase-orders' && <PurchaseOrdersModule />}
           {activeTab === 'vendor-bills' && <VendorBillsModule />}
           {activeTab === 'payments' && <PaymentsModule />}
           {activeTab === 'my-bills' && <CustomerBillsModule />}
+          
         </div>
       </main>
     </div>
