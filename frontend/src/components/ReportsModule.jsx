@@ -515,13 +515,13 @@ export default function ReportsModule() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#E6DFD5]/40 dark:divide-[#382D27]">
-                        {pnlData.salesRevenue?.accounts?.length > 0 ? (
-                          pnlData.salesRevenue.accounts.map(acc => (
+                        {pnlData.salesRevenue?.items?.length > 0 ? (
+                          pnlData.salesRevenue.items.map(acc => (
                             <tr key={acc.id} className="hover:bg-[#FAF6EE]/50 dark:hover:bg-[#221B17]/50">
                               <td className="py-2 px-4 font-medium text-[#2C221E] dark:text-[#F5EFE6]">{acc.name}</td>
                               <td className="py-2 px-4 text-right font-mono text-[#6B5E55]">{formatINR(acc.debit)}</td>
                               <td className="py-2 px-4 text-right font-mono text-[#6B5E55]">{formatINR(acc.credit)}</td>
-                              <td className="py-2 px-4 text-right font-mono font-bold text-[#2C221E] dark:text-[#F5EFE6]">{formatINR(acc.netBalance)}</td>
+                              <td className="py-2 px-4 text-right font-mono font-bold text-[#2C221E] dark:text-[#F5EFE6]">{formatINR(acc.amount)}</td>
                             </tr>
                           ))
                         ) : (
@@ -551,13 +551,13 @@ export default function ReportsModule() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#E6DFD5]/40 dark:divide-[#382D27]">
-                        {pnlData.directPurchases?.accounts?.length > 0 ? (
-                          pnlData.directPurchases.accounts.map(acc => (
+                        {pnlData.directPurchases?.items?.length > 0 ? (
+                          pnlData.directPurchases.items.map(acc => (
                             <tr key={acc.id} className="hover:bg-[#FAF6EE]/50 dark:hover:bg-[#221B17]/50">
                               <td className="py-2 px-4 font-medium text-[#2C221E] dark:text-[#F5EFE6]">{acc.name}</td>
                               <td className="py-2 px-4 text-right font-mono text-[#6B5E55]">{formatINR(acc.debit)}</td>
                               <td className="py-2 px-4 text-right font-mono text-[#6B5E55]">{formatINR(acc.credit)}</td>
-                              <td className="py-2 px-4 text-right font-mono font-bold text-[#2C221E] dark:text-[#F5EFE6]">{formatINR(acc.netBalance)}</td>
+                              <td className="py-2 px-4 text-right font-mono font-bold text-[#2C221E] dark:text-[#F5EFE6]">{formatINR(acc.amount)}</td>
                             </tr>
                           ))
                         ) : (
@@ -587,13 +587,13 @@ export default function ReportsModule() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#E6DFD5]/40 dark:divide-[#382D27]">
-                        {pnlData.operatingExpenses?.accounts?.length > 0 ? (
-                          pnlData.operatingExpenses.accounts.map(acc => (
+                        {pnlData.operatingExpenses?.items?.length > 0 ? (
+                          pnlData.operatingExpenses.items.map(acc => (
                             <tr key={acc.id} className="hover:bg-[#FAF6EE]/50 dark:hover:bg-[#221B17]/50">
                               <td className="py-2 px-4 font-medium text-[#2C221E] dark:text-[#F5EFE6]">{acc.name}</td>
                               <td className="py-2 px-4 text-right font-mono text-[#6B5E55]">{formatINR(acc.debit)}</td>
                               <td className="py-2 px-4 text-right font-mono text-[#6B5E55]">{formatINR(acc.credit)}</td>
-                              <td className="py-2 px-4 text-right font-mono font-bold text-[#2C221E] dark:text-[#F5EFE6]">{formatINR(acc.netBalance)}</td>
+                              <td className="py-2 px-4 text-right font-mono font-bold text-[#2C221E] dark:text-[#F5EFE6]">{formatINR(acc.amount)}</td>
                             </tr>
                           ))
                         ) : (
@@ -656,8 +656,8 @@ export default function ReportsModule() {
                   </div>
 
                   <div className="space-y-2">
-                    {bsData.assets?.accounts?.length > 0 ? (
-                      bsData.assets.accounts.map(acc => (
+                    {bsData.assets?.items?.length > 0 ? (
+                      bsData.assets.items.map(acc => (
                         <div key={acc.id} className="flex items-center justify-between text-xs py-2 px-3 rounded-lg bg-[#FAF6EE]/50 dark:bg-[#221B17]/50 border border-[#E6DFD5]/40 dark:border-[#382D27]/40">
                           <div>
                             <div className="font-medium text-[#2C221E] dark:text-[#F5EFE6]">{acc.name}</div>
@@ -686,8 +686,8 @@ export default function ReportsModule() {
                   {/* Liabilities Section */}
                   <div className="space-y-2">
                     <div className="text-xs font-semibold text-[#8C7E74] uppercase tracking-wider">Liabilities</div>
-                    {bsData.liabilities?.accounts?.length > 0 ? (
-                      bsData.liabilities.accounts.map(acc => (
+                    {bsData.liabilities?.items?.length > 0 ? (
+                      bsData.liabilities.items.map(acc => (
                         <div key={acc.id} className="flex items-center justify-between text-xs py-2 px-3 rounded-lg bg-[#FAF6EE]/50 dark:bg-[#221B17]/50 border border-[#E6DFD5]/40 dark:border-[#382D27]/40">
                           <div>
                             <div className="font-medium text-[#2C221E] dark:text-[#F5EFE6]">{acc.name}</div>
@@ -704,7 +704,7 @@ export default function ReportsModule() {
                   {/* Equity Section */}
                   <div className="space-y-2 pt-2 border-t border-[#E6DFD5]/40 dark:border-[#382D27]/60">
                     <div className="text-xs font-semibold text-[#8C7E74] uppercase tracking-wider">Equity & Capital</div>
-                    {bsData.equity?.accounts?.length > 0 && bsData.equity.accounts.map(acc => (
+                    {bsData.equity?.items?.length > 0 && bsData.equity.items.map(acc => (
                       <div key={acc.id} className="flex items-center justify-between text-xs py-2 px-3 rounded-lg bg-[#FAF6EE]/50 dark:bg-[#221B17]/50 border border-[#E6DFD5]/40 dark:border-[#382D27]/40">
                         <div>
                           <div className="font-medium text-[#2C221E] dark:text-[#F5EFE6]">{acc.name}</div>
@@ -715,16 +715,16 @@ export default function ReportsModule() {
                     ))}
                     
                     {/* Retained Earnings / Net Profit line */}
-                    {bsData.equity?.retainedEarnings && (
+                    {typeof bsData.equity?.retainedEarnings === 'number' && (
                       <div className="flex items-center justify-between text-xs py-2 px-3 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/30 border border-emerald-200/50 dark:border-emerald-800/50">
                         <div>
                           <div className="font-medium text-emerald-900 dark:text-emerald-200">
-                            {bsData.equity.retainedEarnings.label}
+                            Retained Earnings / Net Profit
                           </div>
                           <span className="text-[10px] text-emerald-700 dark:text-emerald-400">Cumulative bottom line</span>
                         </div>
                         <span className="font-mono font-bold text-emerald-700 dark:text-emerald-300">
-                          {formatINR(bsData.equity.retainedEarnings.amount)}
+                          {formatINR(bsData.equity.retainedEarnings)}
                         </span>
                       </div>
                     )}
