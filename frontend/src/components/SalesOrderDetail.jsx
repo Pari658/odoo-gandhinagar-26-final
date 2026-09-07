@@ -130,6 +130,32 @@ export default function SalesOrderDetail({ id, onBack, onEdit, onStatusChange })
               {invoicing ? 'Creating Invoice...' : 'Create Invoice / Mark as Invoiced'}
             </button>
           )}
+
+          {order.status === 'invoiced' && order.invoiceId && (
+            <button 
+              onClick={() => {
+                // Find and click the Bills & Invoices tab to redirect
+                const spans = Array.from(document.querySelectorAll('button span'));
+                const targetSpan = spans.find(s => s.textContent === 'Bills & Invoices');
+                if (targetSpan && targetSpan.parentElement) {
+                  targetSpan.parentElement.click();
+                  
+                  // Dispatch event for BillsInvoicesModule to catch and open the exact invoice
+                  setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('OPEN_BILL_INVOICE', {
+                      detail: { type: 'invoices', id: order.invoiceId }
+                    }));
+                  }, 50);
+                } else {
+                  alert('Navigate to Bills & Invoices to view this document.');
+                }
+              }}
+              className="flex items-center justify-center gap-2 px-6 py-2 rounded-lg bg-[#714B67] hover:bg-[#5a3b52] text-white text-sm font-bold shadow-sm transition-all"
+            >
+              <FileText className="w-4 h-4" />
+              View Generated Invoice
+            </button>
+          )}
         </div>
       </div>
 

@@ -13,6 +13,7 @@ import PaymentsModule from './components/PaymentsModule.jsx';
 import SalesOrdersModule from './components/SalesOrdersModule.jsx';
 import ReportsModule from './components/ReportsModule.jsx';
 import BudgetModule from './components/BudgetModule.jsx';
+import BillsInvoicesModule from './components/BillsInvoicesModule.jsx';
 import AdminDashboard from './components/AdminDashboard.jsx';
 import AuthPage from './components/AuthPage.jsx';
 import LandingPage from './components/LandingPage.jsx';
@@ -29,7 +30,8 @@ import {
   ShoppingCart,
   FileText,
   CreditCard,
-  WalletCards
+  WalletCards,
+  ReceiptText
 } from 'lucide-react';
 
 export default function App() {
@@ -83,6 +85,7 @@ export default function App() {
     { id: 'tax-rates', label: 'Tax Rates', icon: Percent },
     { id: 'analytic-accounts', label: 'Analytic Accounts', icon: PieChart },
     { id: 'budgets', label: 'Budgets', icon: WalletCards },
+    { id: 'bills-invoices', label: 'Bills & Invoices', icon: ReceiptText },
     { id: 'vendor-bills', label: 'Vendor Bills', icon: FileText },
     { id: 'payments', label: 'Payments', icon: CreditCard },
     { id: 'reports', label: 'Reports & Statements', icon: Scale }
@@ -108,6 +111,7 @@ export default function App() {
           {activeTab === 'tax-rates' && <TaxRatesModule />}
           {activeTab === 'analytic-accounts' && <AnalyticAccountsModule />}
           {activeTab === 'budgets' && <BudgetModule />}
+          {activeTab === 'bills-invoices' && <BillsInvoicesModule />}
           {activeTab === 'purchase-orders' && <PurchaseOrdersModule />}
           {activeTab === 'vendor-bills' && <VendorBillsModule />}
           {activeTab === 'payments' && <PaymentsModule />}

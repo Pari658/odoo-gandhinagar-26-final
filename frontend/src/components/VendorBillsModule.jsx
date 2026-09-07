@@ -181,8 +181,18 @@ export default function VendorBillsModule() {
 
   const handleConfirm = async (id) => {
     try {
-      await apiRequest('POST', `/vendor-bills/${id}/confirm`);
-      setMessage({ type: 'success', text: 'Vendor Bill confirmed and posted to ledger!' });
+      const res = await apiRequest('POST', `/vendor-bills/${id}/confirm`);
+      let successMsg = 'Vendor Bill confirmed and posted to ledger!';
+      
+      if (res.budgetImpact && res.budgetImpact.length > 0) {
+        const formatMoney = val => Number(val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+        const impacts = res.budgetImpact.map(b => 
+          `Budget "${b.budgetName}": ₹${formatMoney(b.deductedAmount)} spent. Remaining: ₹${formatMoney(b.remainingBudget)}`
+        ).join(' | ');
+        successMsg += `\n${impacts}`;
+      }
+
+      setMessage({ type: 'success', text: successMsg });
       fetchVendorBills();
       if (view === 'detail' && selectedBillId === id) {
         loadBillDetail(id);
@@ -307,6 +317,31 @@ export default function VendorBillsModule() {
               </button>
             </div>
           )}
+
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => {
+                const spans = Array.from(document.querySelectorAll('button span'));
+                const targetSpan = spans.find(s => s.textContent === 'Bills & Invoices');
+                if (targetSpan && targetSpan.parentElement) {
+                  targetSpan.parentElement.click();
+                  
+                  // Dispatch event for BillsInvoicesModule to catch and open the exact bill
+                  setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('OPEN_BILL_INVOICE', {
+                      detail: { type: 'bills', id: billDetail.id }
+                    }));
+                  }, 50);
+                } else {
+                  alert('Navigate to Bills & Invoices to view this document.');
+                }
+              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#714B67] hover:bg-[#5a3b52] text-white text-xs font-bold transition-all cursor-pointer shadow-xs ml-2"
+            >
+              <FileText className="w-4 h-4" />
+              <span>View in Bills & Invoices</span>
+            </button>
+          </div>
         </div>
 
         {message && (

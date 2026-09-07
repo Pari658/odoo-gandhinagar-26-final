@@ -235,6 +235,50 @@ export const confirmVendorBill = async (req, res, next) => {
       [id, je.id]
     );
 
+    // 5. Calculate Budget Impact
+    const budgetImpact = [];
+    for (const line of linesRes.rows) {
+      if (line.analytic_account_id) {
+        const lineTotal = Number(line.quantity) * Number(line.unit_price);
+        
+        // Find budget for this analytic account active during invoice date
+        const budgetRes = await client.query(`
+          SELECT 
+            b.id AS budget_id,
+            b.name AS budget_name,
+            aa.name AS analytic_name,
+            b.committed_amount,
+            COALESCE(achieved.achieved_amount, 0) AS achieved_amount
+          FROM budgets b
+          JOIN analytic_accounts aa ON aa.id = b.analytic_account_id
+          LEFT JOIN LATERAL (
+              SELECT SUM(vbl.quantity * vbl.unit_price) AS achieved_amount
+              FROM vendor_bill_lines vbl
+              JOIN vendor_bills vb ON vb.id = vbl.vendor_bill_id
+              WHERE vbl.analytic_account_id = b.analytic_account_id
+                AND vb.journal_entry_id IS NOT NULL
+                AND vb.invoice_date BETWEEN b.period_start AND b.period_end
+          ) achieved ON TRUE
+          WHERE b.analytic_account_id = $1
+            AND b.status = 'confirmed'
+            AND $2::date BETWEEN b.period_start AND b.period_end
+          LIMIT 1
+        `, [line.analytic_account_id, bill.invoice_date]);
+
+        if (budgetRes.rowCount > 0) {
+          const b = budgetRes.rows[0];
+          budgetImpact.push({
+            budgetName: b.budget_name,
+            analyticName: b.analytic_name,
+            committedAmount: Number(b.committed_amount),
+            achievedAmount: Number(b.achieved_amount),
+            deductedAmount: lineTotal,
+            remainingBudget: Number(b.committed_amount) - Number(b.achieved_amount)
+          });
+        }
+      }
+    }
+
     await client.query('COMMIT');
 
     res.json({
@@ -242,7 +286,8 @@ export const confirmVendorBill = async (req, res, next) => {
       data: {
         id: bill.id,
         status: 'unpaid',
-        journalEntryId: je.id
+        journalEntryId: je.id,
+        budgetImpact
       },
       error: null
     });

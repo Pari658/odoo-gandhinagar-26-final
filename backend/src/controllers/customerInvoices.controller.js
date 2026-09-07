@@ -145,3 +145,75 @@ export async function getMyBills(req, res, next) {
     next(error);
   }
 }
+
+export async function getCustomerInvoiceById(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    const invoiceResult = await pool.query(`
+      SELECT ci.id, ci.number, ci.customer_id, c.name AS customer_name, c.email AS customer_email,
+             ci.invoice_date, ci.due_date, ci.total_amount, ci.amount_paid, ci.status, ci.journal_entry_id,
+             so.number AS sales_order_number, so.order_date AS sales_order_date
+      FROM customer_invoices ci
+      JOIN contacts c ON c.id = ci.customer_id
+      LEFT JOIN sales_orders so ON so.id = ci.sales_order_id
+      WHERE ci.id = $1
+    `, [id]);
+
+    if (invoiceResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: 'NOT_FOUND', message: 'Customer invoice not found' }
+      });
+    }
+
+    const invoice = invoiceResult.rows[0];
+
+    // Optional: add authorization check here if needed for contact users
+    if (req.user && req.user.role === 'contact' && invoice.customer_id !== req.user.contactId) {
+       return res.status(403).json({ success: false, data: null, error: { code: 'FORBIDDEN', message: 'Not authorized to view this invoice' } });
+    }
+
+    const linesResult = await pool.query(`
+      SELECT cil.id, cil.product_id, p.name AS product_name,
+             cil.quantity, cil.unit_price
+      FROM customer_invoice_lines cil
+      LEFT JOIN products p ON p.id = cil.product_id
+      WHERE cil.customer_invoice_id = $1
+    `, [id]);
+
+    const lines = linesResult.rows.map(l => ({
+      id: l.id,
+      productId: l.product_id,
+      productName: l.product_name || 'Product Item',
+      quantity: Number(l.quantity),
+      unitPrice: Number(l.unit_price),
+      total: Number(l.quantity) * Number(l.unit_price)
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        id: invoice.id,
+        number: invoice.number,
+        customerId: invoice.customer_id,
+        customerName: invoice.customer_name,
+        customerEmail: invoice.customer_email,
+        invoiceDate: invoice.invoice_date,
+        dueDate: invoice.due_date,
+        totalAmount: Number(invoice.total_amount),
+        amountPaid: Number(invoice.amount_paid),
+        amountDue: Number(invoice.total_amount) - Number(invoice.amount_paid),
+        status: invoice.status,
+        journalEntryId: invoice.journal_entry_id,
+        salesOrderNumber: invoice.sales_order_number || null,
+        salesOrderDate: invoice.sales_order_date || null,
+        lines
+      },
+      error: null
+    });
+  } catch (error) {
+    next(error);
+  }
+}
