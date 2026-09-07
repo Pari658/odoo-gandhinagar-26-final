@@ -20,5 +20,5 @@ const createRateLimiter = (maxRequests, windowMs = 90 * 60 * 1000) => {
 };
 
 // Rate limiter configured for 90-minute window
-export const authLimiter = createRateLimiter(50, 90 * 60 * 1000); // 50 requests per 90 minutes
-export const apiLimiter = createRateLimiter(500, 90 * 60 * 1000); // 500 requests per 90 minutes
+export const authLimiter = createRateLimiter(5000, 90 * 60 * 1000); // 50 requests per 90 minutes
+export const apiLimiter = createRateLimiter(5000, 90 * 60 * 1000); // 500 requests per 90 minutes

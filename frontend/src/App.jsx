@@ -112,7 +112,6 @@ export default function App() {
           {activeTab === 'vendor-bills' && <VendorBillsModule />}
           {activeTab === 'payments' && <PaymentsModule />}
           {activeTab === 'my-bills' && <CustomerBillsModule />}
-          
         </div>
       </main>
     </div>
