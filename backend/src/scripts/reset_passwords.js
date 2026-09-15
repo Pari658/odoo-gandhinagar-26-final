@@ -9,6 +9,10 @@ async function reset() {
   await query('UPDATE users SET password_hash = $1 WHERE login_id = $2 OR email = $3', [acctHash, 'acctuser', 'accountant@urbanfurniture.com']);
 
   console.log('✅ PASSWORDS UPDATED SUCCESSFULLY IN SUPABASE DATABASE!');
+  process.exit(0);
 }
 
-reset().catch(console.error);
+reset().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
