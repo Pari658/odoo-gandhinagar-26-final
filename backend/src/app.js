@@ -22,7 +22,17 @@ const app = express();
 // ---------------------------------------------------------------------------
 // Global Middleware
 // ---------------------------------------------------------------------------
-app.use(cors({ origin: ['http://localhost:3000', 'http://0.0.0.0:3000'] }));
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://0.0.0.0:3000',
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
+app.use(cors({
+  origin: allowedOrigins
+}));
+
 app.use(express.json({ limit: '10mb' }));
 app.use('/api', apiLimiter);
 
@@ -57,7 +67,6 @@ app.use(['/api/v1/sales-orders', '/api/sales-orders', '/sales-orders'], salesOrd
 app.use(['/api/v1/customer-invoices', '/api/customer-invoices', '/customer-invoices'], customerInvoicesRoutes);
 app.use(['/api/v1/reports', '/api/reports', '/reports'], reportsRoutes);
 app.use(['/api/v1/budgets', '/api/budgets', '/budgets'], budgetsRoutes);
-app.use(['/api/v1/customer-invoices', '/api/customer-invoices', '/customer-invoices'], customerInvoicesRoutes);
 
 // ---------------------------------------------------------------------------
 
